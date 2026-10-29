@@ -95,7 +95,7 @@ Current implementation limits: 8,192 chunks per snapshot, 32 MiB per region file
 1 MiB manifest, and 512 KiB game payload. These are validated before large reads;
 world memory still scales with resident chunks. Empty worlds are valid.
 
-The game-owned payload starts with `VCPLAYER`, then u32 version 9, five IEEE-754
+The game-owned payload starts with `VCPLAYER`, then u32 version 10, five IEEE-754
 binary64 values (camera XYZ, yaw, pitch), u32 flight flag (0/1), a u32 selected slot
 (0..8), and nine length-prefixed hotbar identifiers (empty string means empty slot).
 Version 3 then stores u32 survival-mode flag, u32 health (0..20), and 36 item stacks.
@@ -136,7 +136,16 @@ saves retain the offline base player. Profile velocity and transient mining/AI
 state are not persisted. The game-data bound is now 512 KiB to fit all profiles;
 metadata/region format stays version 1 and previous snapshots remain readable.
 See [ADR0013](decisions/0013-authoritative-multiplayer.md).
-Version 1..8 player payloads remain readable: v1 migrates its selected material into
+Version 10 appends u32 per-profile mode (0 inherits world default, 1 creative,
+2 survival), then a u32 spawn-present flag and three binary64 feet coordinates
+when present. After all profiles it appends the base player's spawn flag/coordinates.
+Namespaced hotbar strings now also resolve ordinary/tool items; unresolved names
+remain missing-item assignments. Region/metadata schemas and item identifiers are
+unchanged. Versions 1..9 load with no custom spawn and inherited profile mode.
+Old versions cannot read newly written player payload 10; preserve a backup before
+downgrading. The settings payload separately advances from 1 to 2 to append UI scale.
+
+Version 1..9 player payloads remain readable: v1 migrates its selected material into
 slot zero, and v1/v2 migrate to creative mode with full health and empty survival
 stacks. Camera inputs are validated for finiteness and the
 supported ±1e15 physics range. Velocity is not persisted; walking resumes under

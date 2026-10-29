@@ -129,3 +129,14 @@ TEST(Input, ExplicitDiscardExitWorksWithoutCaptureAndSurvivesFocusLoss) {
     const auto input=state.consume();EXPECT_TRUE(input.quit);EXPECT_TRUE(input.quitWithoutSaving);
     EXPECT_FALSE(state.consume().quitWithoutSaving);
 }
+TEST(Input, ConsoleUsesUnicodeTextEventsAndIsolatesAllGameplayKeys) {
+    vc::InputState state;state.setCaptured(true);state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_W));
+    state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_SLASH));auto input=state.consume();EXPECT_EQ(input.console,1);EXPECT_FALSE(input.captured);EXPECT_EQ(input.forward,0);
+    SDL_Event text{};text.type=SDL_EVENT_TEXT_INPUT;text.text.text="Привет /give";state.process(text);
+    for(const auto scan:{SDL_SCANCODE_W,SDL_SCANCODE_E,SDL_SCANCODE_C,SDL_SCANCODE_F,SDL_SCANCODE_SPACE,SDL_SCANCODE_1}) state.process(key(SDL_EVENT_KEY_DOWN,scan));
+    state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_BACKSPACE));input=state.consume();EXPECT_EQ(input.text.text,"Привет /give");EXPECT_TRUE(input.text.backspace);
+    EXPECT_FALSE(input.inventory);EXPECT_FALSE(input.crafting);EXPECT_FALSE(input.toggleFlight);EXPECT_FALSE(input.jump);EXPECT_EQ(input.material,0);EXPECT_EQ(input.forward,0);
+    auto copy=key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_C);copy.key.mod=SDL_KMOD_CTRL;state.process(copy);EXPECT_TRUE(state.consume().text.copy);
+    state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_ESCAPE));EXPECT_TRUE(state.consume().closeUi);
+    state.setTextInput(false);state.setCaptured(true);EXPECT_EQ(state.consume().forward,0);
+}

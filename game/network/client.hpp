@@ -16,6 +16,8 @@ public:
     void hotbar(const Hotbar& hotbar);
     void inventory(const InventoryAction& action);
     void requestSave();
+    std::uint64_t command(std::string text);
+    std::vector<CommandReply> takeCommandReplies();
     void disconnect() noexcept;
     std::uint64_t sentBytes() const;
     std::uint64_t receivedBytes() const;

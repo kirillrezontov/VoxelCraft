@@ -3,7 +3,7 @@
 #include <array>
 
 namespace vc {
-AtlasLayout builtinAtlasLayout() { return {16, 17, 1}; }
+AtlasLayout builtinAtlasLayout() { return {16, 23, 1}; }
 ImageRgba builtinAtlas() {
     const auto layout = builtinAtlasLayout();
     ImageRgba image{layout.width(), layout.height(), {}};
@@ -46,6 +46,21 @@ ImageRgba builtinAtlas() {
             const auto offset = (static_cast<std::size_t>(imageY) * image.width + imageX) * 4;
             for (std::size_t channel = 0; channel < 3; ++channel) image.pixels[offset + channel] = static_cast<std::uint8_t>(color[channel]);
             image.pixels[offset + 3] = 255;
+            if(tile>=tiles::itemStick) {
+                const int ix=static_cast<int>(px),iy=static_cast<int>(py);std::array<int,3> ink{220,210,180};bool paint=false;
+                if(tile==tiles::itemStick) { paint=ix>=3&&ix<=12&&std::abs(ix+iy-16)<=1;ink={153,104,58}; }
+                if(tile==tiles::itemCoal) { paint=(ix-8)*(ix-8)*2+(iy-8)*(iy-8)<64;ink=ix+iy<14?std::array<int,3>{65,77,87}:std::array<int,3>{26,34,42}; }
+                if(tile==tiles::itemMeat) { paint=(ix-8)*(ix-8)+(iy-8)*(iy-8)*2<63;ink=std::abs(ix+iy-16)<2?std::array<int,3>{245,196,169}:std::array<int,3>{195,75,77}; }
+                if(tile==tiles::woodenPickaxe||tile==tiles::stonePickaxe) {
+                    if(ix>=3&&iy>=4&&std::abs(ix+iy-16)<=1) { paint=true;ink={153,104,58}; }
+                    if((iy>=2&&iy<=4&&ix>=2&&ix<=12)||(ix>=11&&ix<=13&&iy>=3&&iy<=8)) {
+                        paint=true;ink=tile==tiles::stonePickaxe?std::array<int,3>{164,185,196}:std::array<int,3>{205,154,88};
+                    }
+                }
+                if(tile==tiles::missingItem) { paint=ix>=2&&ix<=13&&iy>=2&&iy<=13;ink=(ix/3+iy/3)%2?std::array<int,3>{181,84,190}:std::array<int,3>{58,43,69}; }
+                for(std::size_t c=0;c<3;++c) image.pixels[offset+c]=static_cast<std::uint8_t>(ink[c]);
+                image.pixels[offset+3]=paint?255:0;
+            }
         }
     }
     image.validate();

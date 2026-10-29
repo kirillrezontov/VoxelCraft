@@ -3,6 +3,7 @@
 #include "engine/renderer/overlay.hpp"
 #include "engine/renderer/frustum.hpp"
 #include "engine/core/log.hpp"
+#include "engine/ui/font.hpp"
 #include "engine/platform/window.hpp"
 #include "game/player/camera.hpp"
 #include <algorithm>
@@ -114,7 +115,8 @@ struct VulkanRenderer::Impl {
     VkPipeline pipeline{};
     VkPipeline hudPipeline{};
     VkPipeline translucentPipeline{};
-    std::unique_ptr<Texture> atlasTexture;
+    std::unique_ptr<Texture> atlasTexture,fontTexture;
+    std::uint64_t fontRevision{};
     VkDescriptorSetLayout descriptorLayout{};
     VkDescriptorPool descriptorPool{};
     VkDescriptorSet descriptor{};
@@ -146,7 +148,7 @@ struct VulkanRenderer::Impl {
             if (pipelineLayout) vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
             if (descriptorPool) vkDestroyDescriptorPool(device, descriptorPool, nullptr);
             if (descriptorLayout) vkDestroyDescriptorSetLayout(device, descriptorLayout, nullptr);
-            atlasTexture.reset();
+            atlasTexture.reset();fontTexture.reset();
             if (acquired) vkDestroySemaphore(device, acquired, nullptr);
             if (frameFence) vkDestroyFence(device, frameFence, nullptr);
             if (commandPool) vkDestroyCommandPool(device, commandPool, nullptr);
@@ -177,7 +179,8 @@ struct VulkanRenderer::Impl {
         vkCheck(vkCreateFence(device, &fence, nullptr, &frameFence), "Create frame fence");
         auto semaphore = vkStructure<VkSemaphoreCreateInfo>(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
         vkCheck(vkCreateSemaphore(device, &semaphore, nullptr, &acquired), "Create acquire semaphore");
-        createAtlas(atlas);
+        atlasTexture=createTexture(atlas);
+        fontTexture=createTexture(ui::fonts().image(),true);fontRevision=ui::fonts().revision();
         createDescriptors();
         VkPushConstantRange push{VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(PushConstants)};
         auto layout = vkStructure<VkPipelineLayoutCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO);
@@ -368,7 +371,7 @@ struct VulkanRenderer::Impl {
         VkImageView view{}; vkCheck(vkCreateImageView(device, &info, nullptr, &view), "Create image view"); return view;
     }
 
-    void createAtlas(const ImageRgba& image) {
+    std::unique_ptr<Texture> createTexture(const ImageRgba& image,bool linear=false) {
         VkPhysicalDeviceProperties properties{}; vkGetPhysicalDeviceProperties(physical, &properties);
         if (image.width > properties.limits.maxImageDimension2D || image.height > properties.limits.maxImageDimension2D)
             throw std::runtime_error("Texture atlas exceeds GPU image dimensions");
@@ -391,6 +394,7 @@ struct VulkanRenderer::Impl {
         auto staging = createBuffer(image.pixels.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, image.pixels.data());
         auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkCheck(vkResetCommandBuffer(command,0),"Reset texture upload commands");
         vkCheck(vkBeginCommandBuffer(command, &begin), "Begin atlas upload");
         barrier(texture->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
@@ -405,29 +409,34 @@ struct VulkanRenderer::Impl {
         vkCheck(vkQueueWaitIdle(graphicsQueue), "Wait for atlas upload");
         texture->view = createView(texture->image, info.format, VK_IMAGE_ASPECT_COLOR_BIT);
         auto sampler = vkStructure<VkSamplerCreateInfo>(VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO);
-        sampler.magFilter = sampler.minFilter = VK_FILTER_NEAREST; sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        sampler.magFilter = sampler.minFilter = linear?VK_FILTER_LINEAR:VK_FILTER_NEAREST; sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
         sampler.addressModeU = sampler.addressModeV = sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         vkCheck(vkCreateSampler(device, &sampler, nullptr, &texture->sampler), "Create atlas sampler");
-        atlasTexture = std::move(texture);
+        return texture;
     }
 
     void createDescriptors() {
-        const VkDescriptorSetLayoutBinding binding{0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr};
-        auto layout = vkStructure<VkDescriptorSetLayoutCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
-        layout.bindingCount = 1; layout.pBindings = &binding;
-        vkCheck(vkCreateDescriptorSetLayout(device, &layout, nullptr, &descriptorLayout), "Create atlas descriptor layout");
-        const VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1};
-        auto pool = vkStructure<VkDescriptorPoolCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
-        pool.maxSets = 1; pool.poolSizeCount = 1; pool.pPoolSizes = &size;
-        vkCheck(vkCreateDescriptorPool(device, &pool, nullptr, &descriptorPool), "Create atlas descriptor pool");
-        auto alloc = vkStructure<VkDescriptorSetAllocateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
-        alloc.descriptorPool = descriptorPool; alloc.descriptorSetCount = 1; alloc.pSetLayouts = &descriptorLayout;
-        vkCheck(vkAllocateDescriptorSets(device, &alloc, &descriptor), "Allocate atlas descriptor");
-        const VkDescriptorImageInfo image{atlasTexture->sampler, atlasTexture->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-        auto write = vkStructure<VkWriteDescriptorSet>(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
-        write.dstSet = descriptor; write.dstBinding = 0; write.descriptorCount = 1;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; write.pImageInfo = &image;
-        vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+        const std::array<VkDescriptorSetLayoutBinding,2> bindings{{
+            {0,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr},
+            {1,VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,1,VK_SHADER_STAGE_FRAGMENT_BIT,nullptr}}};
+        auto layout=vkStructure<VkDescriptorSetLayoutCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
+        layout.bindingCount=2;layout.pBindings=bindings.data();
+        vkCheck(vkCreateDescriptorSetLayout(device,&layout,nullptr,&descriptorLayout),"Create texture descriptor layout");
+        const VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,2};
+        auto pool=vkStructure<VkDescriptorPoolCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
+        pool.maxSets=1;pool.poolSizeCount=1;pool.pPoolSizes=&size;
+        vkCheck(vkCreateDescriptorPool(device,&pool,nullptr,&descriptorPool),"Create texture descriptor pool");
+        auto alloc=vkStructure<VkDescriptorSetAllocateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
+        alloc.descriptorPool=descriptorPool;alloc.descriptorSetCount=1;alloc.pSetLayouts=&descriptorLayout;
+        vkCheck(vkAllocateDescriptorSets(device,&alloc,&descriptor),"Allocate texture descriptors");
+        updateTextureDescriptor(0,*atlasTexture);updateTextureDescriptor(1,*fontTexture);
+    }
+    void updateTextureDescriptor(std::uint32_t binding,const Texture& texture) {
+        const VkDescriptorImageInfo image{texture.sampler,texture.view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
+        auto write=vkStructure<VkWriteDescriptorSet>(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
+        write.dstSet=descriptor;write.dstBinding=binding;write.descriptorCount=1;
+        write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;write.pImageInfo=&image;
+        vkUpdateDescriptorSets(device,1,&write,0,nullptr);
     }
 
     void destroySwapchain() {
@@ -588,7 +597,7 @@ struct VulkanRenderer::Impl {
             blend.colorBlendOp=VK_BLEND_OP_ADD;blend.srcAlphaBlendFactor=VK_BLEND_FACTOR_ONE;blend.dstAlphaBlendFactor=VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
             blend.alphaBlendOp=VK_BLEND_OP_ADD;
             vkCheck(vkCreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&info,nullptr,&translucentPipeline),"Create translucent graphics pipeline");
-            blend.blendEnable=VK_FALSE;
+            // HUD panels and cached glyphs use ordinary alpha blending.
             depth.depthTestEnable=depth.depthWriteEnable=VK_FALSE;
             raster.cullMode=VK_CULL_MODE_NONE;
             vkCheck(vkCreateGraphicsPipelines(device,VK_NULL_HANDLE,1,&info,nullptr,&hudPipeline),"Create HUD graphics pipeline");
@@ -803,6 +812,10 @@ std::size_t VulkanRenderer::drawnTriangleCount() const { return impl_->drawnTria
 void VulkanRenderer::setSelection(std::optional<glm::i64vec3> block) { impl_->selection = block; }
 void VulkanRenderer::setHud(const Mesh& colored,const Mesh& textured,bool crosshairVisible,const Mesh& foreground) {
     vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX),"Wait before replacing HUD meshes");
+    if(impl_->fontRevision!=ui::fonts().revision()) {
+        auto texture=impl_->createTexture(ui::fonts().image(),true);
+        impl_->updateTextureDescriptor(1,*texture);impl_->fontTexture=std::move(texture);impl_->fontRevision=ui::fonts().revision();
+    }
     auto colors=impl_->createMesh(colored),textures=impl_->createMesh(textured),front=impl_->createMesh(foreground);
     impl_->hudColors=std::move(colors);impl_->hudTextures=std::move(textures);
     impl_->hudForeground=std::move(front);

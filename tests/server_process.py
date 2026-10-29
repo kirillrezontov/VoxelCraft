@@ -42,6 +42,16 @@ def main():
         require("Server clean shutdown" in first and "saved world revision 1" in first, first)
         second = run(server, world, "--ticks", "30")
         require("loaded world revision 1" in second and "saved world revision 2" in second, second)
+        # Fragmented stdin and EOF must execute through the simulation owner and
+        # leave the headless process running for the requested bounded lifetime.
+        console = subprocess.run([server, "--no-save", "--port", "0", "--radius", "1",
+                                  "--no-mods", "--no-creatures", "--ticks", "60"],
+                                 input="list\nposition\ntime set night\n" + "x" * 1100 + "\nhelp\n",
+                                 capture_output=True, text=True, timeout=20)
+        transcript = console.stdout + console.stderr
+        require(console.returncode == 0 and "0 players:" in transcript and
+                "18000 ticks" in transcript and "exceeds 1024 bytes" in transcript and
+                "clean shutdown after 60 ticks" in transcript, transcript)
         snapshots = sorted(path.name for path in (world / "snapshots").iterdir())
         rejected = run(server, world, "--ticks", "1", "--seed", "999", success=False)
         require("differs from the saved world" in rejected, rejected)

@@ -19,6 +19,8 @@ struct HostConfig {
     bool populate{true};
     bool trustedLan{}; // Explicit opt-in for unauthenticated non-loopback hosting.
     netgame::ProfileTokens profileTokens;
+    std::filesystem::path permissionsFile;
+    std::vector<std::string> administrators;
 };
 // Authoritative host. The same CPU world/player/mod/actor services run
 // here without creating an SDL window or a Vulkan device.
@@ -31,6 +33,7 @@ public:
     void tick(double seconds);
     std::uint64_t save(); // Zero for a temporary world.
     void shutdown(); // Call after a successful final save; best-effort bounded notification.
+    commands::Result console(std::string_view command);
     bool ready() const;
     std::uint16_t port() const;
     std::size_t playerCount() const;

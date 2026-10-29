@@ -23,7 +23,7 @@ rejected. IPv6 endpoints with a port use brackets: `--connect '[::1]:25565'`.
 The default bind address is `127.0.0.1`, port 25565. `--bind 0.0.0.0` enables IPv4
 LAN connections. Configure the host's firewall as needed. The server supports
 eight connected players and 32 saved profiles. Names identify local/LAN profiles;
-there is no account service, encryption, permissions system or internet hosting
+there is no account service, encryption or internet hosting
 service. Profile-specific credentials can bind each persistent name to its owner.
 An external bind requires credentials or explicit `--trusted-lan`. Loopback without
 credentials is intended for local development; `--trusted-lan` permits profile name
@@ -36,8 +36,9 @@ Create a survival world with:
 ./build/debug/bin/voxelcraft --connect 127.0.0.1 --name Alice
 ```
 
-The saved world mode resumes automatically. Explicit server `--creative` or
-`--survival` changes it while retaining inventories. Creative flight is disabled
+The saved world mode resumes automatically. Server `--creative` or
+`--survival` selects the default for legacy/new profiles; explicit per-profile
+command modes persist independently while retaining counted inventories. Creative flight is disabled
 in survival. Mining, crafting, tool durability, backpack transfers, food, creature
 combat/loot, fall damage, death and R respawn use server authority. Each player
 has separate health and inventory; death keeps items. Inventories are sent only
@@ -153,3 +154,18 @@ Run `python3 tests/network_stress.py build/release/bin/voxelcraft-server --itera
 for fragmented invalid-session stress, and `build/release/bin/vc_network_soak 1800`
 for eight authenticated clients, edits, reconnects, save cycles and restart checks.
 Only bounded runs recorded in the stabilization report have actually executed.
+
+## v0.8.2 commands and operators
+
+Protocol 4 explicitly rejects protocol 3 at handshake. Commands, replies, modes,
+authoritative creative hotbars and pose revisions use bounded snapshots. Camera
+reconciliation snaps on a teleport revision, including short teleports. Each
+profile may have its own survival/creative mode; counted items and tool durability
+are private and preserved. Custom respawn points are saved and checked again at
+respawn, with safe fallback if terrain later obstructs them.
+
+Use `--auth-file PATH --admin Alice` for the initial authenticated operator. Roles
+persist in `<world>/operators.vcp`, or `--permissions-file PATH`. Console `op`/`deop`
+modify roles; anonymous names never inherit them. `--no-console` disables stdin;
+EOF does not stop the host. `/` in the graphical client and stdin use the same
+registry. See the [complete command/permission reference](v0.8.2-commands.md).

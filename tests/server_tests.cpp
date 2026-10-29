@@ -1,3 +1,4 @@
+#include "game/commands/permissions.hpp"
 #include "server/host.hpp"
 #include "game/network/client.hpp"
 #include "game/player/save_state.hpp"
@@ -286,4 +287,93 @@ TEST(ServerHost, ProtocolMismatchAndCommandFloodDoNotInterruptAnotherPlayer) {
     EXPECT_EQ(host.playerCount(),1u);EXPECT_TRUE(alice.open());
     vc::netgame::Input input;input.flags=vc::netgame::Active;alice.input(input);alice.pump();
     ASSERT_TRUE(settle(host,[&]{return alice.state().players.size()==1;},aliceOnly));
+}
+
+TEST(ServerCommands, AuthenticatedRolesRealEffectsPrivateStateAndRestart) {
+    using P=vc::commands::Permission;using C=vc::commands::Code;
+    vc::test::TempDirectory temp;createSurvivalWorld(temp.path());auto settings=config();settings.worldDirectory=temp.path();
+    settings.profileTokens={{"alice",std::string(64,'a')},{"bob",std::string(64,'b')}};settings.administrators={"Alice"};
+    {
+        vc::server::Host host(settings);auto aBlocks=vc::builtinBlocks(),bBlocks=vc::builtinBlocks();
+        vc::netgame::RemoteSession alice("127.0.0.1",host.port(),"Alice",host.fingerprint(),aBlocks,std::string(64,'a'));
+        vc::netgame::RemoteSession bob("127.0.0.1",host.port(),"Bob",host.fingerprint(),bBlocks,std::string(64,'b'));
+        const std::array clients{&alice,&bob};
+        ASSERT_TRUE(settle(host,[&]{return alice.state().survival&&bob.state().survival;},clients));
+        EXPECT_EQ(alice.state().permission,P::Administrator);EXPECT_EQ(bob.state().permission,P::Player);
+        const auto execute=[&](vc::netgame::RemoteSession& client,std::string text) {
+            client.command(text);std::vector<vc::netgame::CommandReply> replies;
+            EXPECT_TRUE(settle(host,[&]{replies=client.takeCommandReplies();return !replies.empty();},clients));
+            return replies.empty()?vc::commands::Result::error(C::InternalFailure,"No reply"):replies.front().result;
+        };
+        EXPECT_EQ(execute(bob,"/give @s voxelcraft:stone 64").code,C::PermissionDenied);EXPECT_EQ(count(bob,"voxelcraft:stone"),0u);
+        EXPECT_TRUE(execute(alice,"/give Bob voxelcraft:stone 64").success());
+        ASSERT_TRUE(settle(host,[&]{return count(bob,"voxelcraft:stone")==64;},clients));EXPECT_EQ(count(alice,"voxelcraft:stone"),0u);
+        EXPECT_TRUE(execute(alice,"/give @s voxelcraft:wooden_pickaxe").success());
+        EXPECT_TRUE(execute(alice,"/gamemode creative").success());
+        ASSERT_TRUE(settle(host,[&]{return !alice.state().survival&&bob.state().survival.has_value();},clients));EXPECT_FALSE(alice.welcome()->survival);EXPECT_TRUE(alice.flying());
+        EXPECT_TRUE(execute(alice,"/tp Bob 8.5 1 8.5").success());
+        ASSERT_TRUE(settle(host,[&]{return glm::length(bob.camera().position-glm::dvec3(8.5,2.62,8.5))<.01;},clients));EXPECT_GT(bob.state().poseRevision,0u);
+        EXPECT_TRUE(execute(alice,"/spawnpoint Bob 8.5 1 8.5").success());
+        EXPECT_TRUE(execute(alice,"/summon voxelcraft:hostile 12.5 1 12.5").success());
+        ASSERT_TRUE(settle(host,[&]{return !bob.state().actors.empty()&&!alice.state().actors.empty();},clients));
+        EXPECT_TRUE(host.console("time set night").success());
+        EXPECT_TRUE(host.console("op Bob").success());
+        ASSERT_TRUE(settle(host,[&]{return bob.state().permission==P::Administrator;},clients));
+        // Let command credits refill using simulation time, not wall time.
+        for(int i=0;i<120;++i) { host.tick(1.0/60);alice.pump();bob.pump(); }
+        EXPECT_TRUE(execute(bob,"/seed").success());EXPECT_EQ(execute(bob,"/op Bob").code,C::PermissionDenied);
+        EXPECT_TRUE(host.console("save").success());
+        alice.disconnect();bob.disconnect();ASSERT_TRUE(settle(host,[&]{return host.playerCount()==0;}));host.save();
+    }
+    // Remove bootstrap grants: roles must come from the persisted role file.
+    settings.administrators.clear();
+    {
+        vc::server::Host host(settings);auto aBlocks=vc::builtinBlocks(),bBlocks=vc::builtinBlocks();
+        vc::netgame::RemoteSession alice("127.0.0.1",host.port(),"ALICE",host.fingerprint(),aBlocks,std::string(64,'a'));
+        vc::netgame::RemoteSession bob("127.0.0.1",host.port(),"Bob",host.fingerprint(),bBlocks,std::string(64,'b'));
+        const std::array clients{&alice,&bob};ASSERT_TRUE(settle(host,[&]{return alice.state().tick&&bob.state().survival.has_value();},clients));
+        EXPECT_FALSE(alice.welcome()->survival);EXPECT_EQ(bob.state().permission,P::Administrator);EXPECT_EQ(count(bob,"voxelcraft:stone"),64u);
+        EXPECT_EQ(alice.state().permission,P::Administrator);
+        EXPECT_EQ(alice.welcome()->profile.items[0].identifier,"voxelcraft:wooden_pickaxe");
+        ASSERT_TRUE(bob.welcome()->profile.spawnPoint);EXPECT_EQ(*bob.welcome()->profile.spawnPoint,glm::dvec3(8.5,1,8.5));
+        EXPECT_TRUE(host.console("deop Bob").success());
+        ASSERT_TRUE(settle(host,[&]{return bob.state().permission==P::Player;},clients));
+        bob.command("/seed");std::vector<vc::netgame::CommandReply> replies;
+        ASSERT_TRUE(settle(host,[&]{replies=bob.takeCommandReplies();return !replies.empty();},clients));EXPECT_EQ(replies.front().result.code,C::PermissionDenied);
+        EXPECT_TRUE(host.console("kick Bob \"Integration complete\"").success());
+        EXPECT_THROW(settle(host,[]{return false;},clients),std::runtime_error);EXPECT_EQ(host.playerCount(),1u);
+    }
+}
+TEST(ServerCommands, AnonymousNamesCannotInheritRolesAndFloodIsBounded) {
+    vc::test::TempDirectory temp;auto settings=config();settings.permissionsFile=temp.path()/"roles.vcp";
+    { vc::commands::PermissionStore roles(settings.permissionsFile);roles.set("Alice",vc::commands::Permission::Administrator); }
+    vc::server::Host host(settings);auto blocks=vc::builtinBlocks();vc::netgame::RemoteSession alice("127.0.0.1",host.port(),"Alice",host.fingerprint(),blocks);
+    const std::array clients{&alice};ASSERT_TRUE(settle(host,[&]{return alice.state().tick!=0;},clients));
+    EXPECT_EQ(alice.state().permission,vc::commands::Permission::Player);
+    alice.command("/seed");std::vector<vc::netgame::CommandReply> replies;
+    ASSERT_TRUE(settle(host,[&]{replies=alice.takeCommandReplies();return !replies.empty();},clients));EXPECT_EQ(replies.front().result.code,vc::commands::Code::PermissionDenied);
+    EXPECT_THROW(alice.command(std::string(1025,'a')),std::exception);
+    for(int i=0;i<40;++i) alice.command("/list");
+    std::size_t rejected=0;ASSERT_TRUE(settle(host,[&]{for(const auto& reply:alice.takeCommandReplies()) if(!reply.result.success()) ++rejected;return rejected>0;},clients));
+    EXPECT_TRUE(alice.open());EXPECT_TRUE(host.console("list").success());
+    EXPECT_EQ(host.console("op Alice").code,vc::commands::Code::PermissionDenied);
+}
+TEST(ServerCommands, DuplicateIdsAndOversizeWireTextDisconnectOnlyTheSender) {
+    auto settings=config();vc::server::Host host(settings);auto blocks=vc::builtinBlocks();
+    vc::netgame::RemoteSession observer("127.0.0.1",host.port(),"Observer",host.fingerprint(),blocks);const std::array clients{&observer};
+    ASSERT_TRUE(settle(host,[&]{return observer.welcome()!=nullptr;},clients));
+    for(const bool oversized:{false,true}) {
+        vc::net::FramedConnection raw(vc::net::TcpStream::connect("127.0.0.1",host.port()));
+        ASSERT_TRUE(raw.queue(vc::netgame::encode(vc::netgame::Hello{host.fingerprint(),"Raw"})));raw.pump();
+        ASSERT_TRUE(settle(host,[&]{raw.pump();return host.playerCount()==2;},clients));
+        while(raw.take()) {}
+        if(oversized) {
+            vc::binary::Writer out;out.u32(static_cast<std::uint32_t>(vc::netgame::Message::Command));out.u64(1);out.text(std::string(1025,'a'));ASSERT_TRUE(raw.queue(out.bytes));
+        } else {
+            const auto command=vc::netgame::encode(vc::netgame::CommandRequest{1,"/position"});ASSERT_TRUE(raw.queue(command));ASSERT_TRUE(raw.queue(command));
+        }
+        raw.pump();ASSERT_TRUE(settle(host,[&]{raw.pump();return host.playerCount()==1;},clients));EXPECT_TRUE(observer.open());
+    }
+    observer.command("/list");std::vector<vc::netgame::CommandReply> replies;
+    ASSERT_TRUE(settle(host,[&]{replies=observer.takeCommandReplies();return !replies.empty();},clients));EXPECT_TRUE(replies.front().result.success());
 }

@@ -15,7 +15,8 @@ struct RemoteSession::Impl {
     std::vector<voxel::BlockId> mapping;
     std::map<voxel::Position,std::uint64_t> revisions;
     std::vector<std::string> notices;
-    std::uint64_t sequence{};
+    std::uint64_t sequence{},commandSequence{},lastReply{};
+    std::vector<CommandReply> replies;
     std::chrono::steady_clock::time_point started=std::chrono::steady_clock::now(),lastReceived=started;
     Impl(std::string host,std::uint16_t port,std::string player,std::uint64_t fingerprint,voxel::BlockRegistry& registry,std::string identityToken)
         :blocks(registry),channel(net::TcpStream::connect(host,port)),name(std::move(player)) {
@@ -51,10 +52,15 @@ struct RemoteSession::Impl {
         case Message::Unload: { const auto p=decodeUnload(message);(void)world.remove(p);revisions.erase(p);break; }
         case Message::State: {
             auto state=decodeState(message);if(state.tick<latest.tick) throw std::runtime_error("Server state tick moved backward");
-            if(state.survival.has_value()!=joined->survival) throw std::runtime_error("Server state game mode changed");
+            joined->survival=state.survival.has_value();
             bool own=false;for(const auto& peer:state.players) if(peer.id==joined->id) own=true;
             if(!own) throw std::runtime_error("Server state omitted the connected player");
             latest=std::move(state);break;
+        }
+        case Message::CommandReply: {
+            auto reply=decodeCommandReply(message);
+            if(reply.id<=lastReply||reply.id>commandSequence) throw std::runtime_error("Unexpected command response ID");
+            lastReply=reply.id;if(replies.size()<64) replies.push_back(std::move(reply));break;
         }
         case Message::Goodbye: {
             const auto reason=decodeText(message,type);channel.close();throw std::runtime_error("Server disconnected: "+reason);
@@ -86,6 +92,8 @@ void RemoteSession::pump() { impl_->pump(); }
 void RemoteSession::input(Input intent) { intent.sequence=++impl_->sequence;impl_->queue(encode(intent)); }
 void RemoteSession::hotbar(const Hotbar& hotbar) { impl_->queue(encode(hotbar)); }
 void RemoteSession::inventory(const InventoryAction& action) { impl_->queue(encode(action)); }
+std::uint64_t RemoteSession::command(std::string text) { const auto id=++impl_->commandSequence;impl_->queue(encode(CommandRequest{id,std::move(text)}));return id; }
+std::vector<CommandReply> RemoteSession::takeCommandReplies() { return std::exchange(impl_->replies,{}); }
 void RemoteSession::requestSave() { impl_->queue(encodeControl(Message::Save)); }
 void RemoteSession::disconnect() noexcept {
     try { if(impl_->channel.open()&&impl_->joined) { (void)impl_->channel.queue(encodeControl(Message::Goodbye));impl_->channel.pump(); } } catch(...) {}

@@ -51,7 +51,7 @@ TEST(Atlas, ContentAndEdgeGutters) {
     const auto side = layout.tileOrigin(vc::tiles::grassSide);
     const auto top = pixel(side.x, side.y), bottom = pixel(side.x, side.y+15);
     EXPECT_GT(top[1], top[0]); EXPECT_GT(bottom[0], bottom[1]);
-    for (std::size_t i = 3; i < image.pixels.size(); i += 4) EXPECT_EQ(image.pixels[i], 255);
+    for(std::size_t i=3;i<image.pixels.size();i+=4) { if(((i/4)%image.width)<17*layout.stride()) { EXPECT_EQ(image.pixels[i],255); } }
 }
 
 TEST(Atlas, CubeFaceMaterialsAndGrassOrientation) {

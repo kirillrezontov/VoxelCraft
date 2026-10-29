@@ -7,8 +7,8 @@
 
 namespace vc {
 ContentAtlas::ContentAtlas() {
-    constexpr std::array<std::string_view,17> names{"white","stone","dirt","grass_top","grass_side",
-        "log","log_top","planks","leaves","cobblestone","coal_ore","iron_ore","sand","sandstone","snow","water","lamp"};
+    constexpr std::array<std::string_view,23> names{"white","stone","dirt","grass_top","grass_side",
+        "log","log_top","planks","leaves","cobblestone","coal_ore","iron_ore","sand","sandstone","snow","water","lamp","item_stick","item_coal","item_meat","wooden_pickaxe","stone_pickaxe","missing_item"};
     const auto source=builtinAtlas();const auto sourceLayout=builtinAtlasLayout();
     for(std::size_t i=0;i<names.size();++i) {
         const auto id=static_cast<TextureTile>(i);const auto origin=sourceLayout.tileOrigin(id);

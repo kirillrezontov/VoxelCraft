@@ -15,14 +15,15 @@ GameSettings read(const std::filesystem::path& path) {
     if(!file.read(reinterpret_cast<char*>(bytes.data()),static_cast<std::streamsize>(bytes.size())))
         throw std::runtime_error("Cannot read settings: "+vc::pathText(path));
     auto in=binary::Reader::checked(bytes);in.magic("VCSETT01");
-    if(in.u32()!=1) throw std::runtime_error("Unsupported settings version");
+    const auto version=in.u32();if(version<1||version>2) throw std::runtime_error("Unsupported settings version");
     GameSettings settings;settings.fieldOfView=in.f64();settings.mouseSensitivity=in.f64();
     const auto inverted=in.u32();if(inverted>1) throw std::runtime_error("Invalid invert-Y setting");
-    settings.invertY=inverted==1;in.finish();settings.validate();return settings;
+    settings.invertY=inverted==1;if(version>=2) settings.uiScale=in.f64();in.finish();settings.validate();return settings;
 }
 std::filesystem::path suffix(std::filesystem::path path,const char* ending) { path+=ending;return path; }
 }
 void GameSettings::validate() const {
+    if(!std::isfinite(uiScale)||uiScale<0.75||uiScale>1.75) throw std::invalid_argument("UI scale must be 0.75..1.75");
     if(!std::isfinite(fieldOfView)||fieldOfView<50||fieldOfView>110)
         throw std::invalid_argument("Field of view must be 50..110 degrees");
     if(!std::isfinite(mouseSensitivity)||mouseSensitivity<0.0005||mouseSensitivity>0.01)
@@ -42,8 +43,8 @@ void saveSettings(const std::filesystem::path& path,const GameSettings& settings
     if(path.empty()) throw std::invalid_argument("Settings path must not be empty");
     if(!path.parent_path().empty()) std::filesystem::create_directories(path.parent_path());
     FileLock lock(suffix(path,".lock"));
-    binary::Writer out;out.raw("VCSETT01");out.u32(1);out.f64(settings.fieldOfView);out.f64(settings.mouseSensitivity);
-    out.u32(settings.invertY?1:0);out.seal();
+    binary::Writer out;out.raw("VCSETT01");out.u32(2);out.f64(settings.fieldOfView);out.f64(settings.mouseSensitivity);
+    out.u32(settings.invertY?1:0);out.f64(settings.uiScale);out.seal();
     const auto temporary=suffix(path,".tmp"),backup=suffix(path,".bak");
     try {
         std::ofstream file(temporary,std::ios::binary|std::ios::trunc);

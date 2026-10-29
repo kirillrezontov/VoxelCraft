@@ -16,6 +16,7 @@ struct ItemDefinition {
     unsigned tier{};
     double miningSpeed{1};
     bool missing{};
+    ContentPresentation presentation{};
 };
 class ItemRegistry {
 public:
@@ -25,9 +26,11 @@ public:
     const ItemDefinition& definition(ItemId id) const { return definitions_.at(id); }
     std::size_t size() const { return definitions_.size(); }
 private:
+    friend class SurvivalInventory; // Missing-content restore may refine a name-only placeholder.
     std::vector<ItemDefinition> definitions_;
     std::map<std::string,ItemId,std::less<>> ids_;
 };
+void retainHotbarItems(ItemRegistry& items,const std::array<std::string,9>& names);
 ItemRegistry builtinItems(const voxel::BlockRegistry& blocks);
 struct ItemStack {
     ItemId item{};
@@ -56,6 +59,8 @@ public:
     bool transfer(std::size_t from,std::size_t to,std::uint16_t count,const ItemRegistry& registry);
     bool moveToBackpack(std::size_t from,const ItemRegistry& registry);
     CraftResult craft(const Recipe& recipe,const ItemRegistry& registry);
+    CraftResult canCraft(const Recipe& recipe,const ItemRegistry& registry) const;
+    bool quickTransfer(std::size_t from,const ItemRegistry& registry);
     unsigned count(ItemId item) const;
     std::array<SavedItemStack,slotCount> save(const ItemRegistry& registry) const;
     void restore(const std::array<SavedItemStack,slotCount>& stacks,std::size_t selected,ItemRegistry& registry);
@@ -67,7 +72,7 @@ private:
     std::size_t selected_{};
     std::uint64_t revision_{};
 };
-enum class InventoryActionKind : std::uint32_t { Swap,TransferOne,MoveToBackpack,Craft };
+enum class InventoryActionKind : std::uint32_t { Swap,TransferOne,MoveToBackpack,Craft,TransferHalf,TransferAll,QuickTransfer };
 struct InventoryAction {
     InventoryActionKind kind{};
     std::uint32_t from{},to{},recipe{};

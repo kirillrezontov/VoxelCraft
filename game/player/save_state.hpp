@@ -22,6 +22,7 @@ struct PlayerSaveState {
     std::vector<SavedActor> actors;
     std::vector<SavedMod> mods;
     std::vector<PlayerProfile> profiles;
+    std::optional<glm::dvec3> spawnPoint{};
 };
 // Explicit versioned encoding inside the world's transactional game-data payload.
 std::string encodePlayer(const PlayerSaveState& player);

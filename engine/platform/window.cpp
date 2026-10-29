@@ -21,6 +21,13 @@ void Window::capture(bool enabled) {
     input_.setCaptured(enabled);
     check(SDL_SetWindowRelativeMouseMode(window_, input_.captured()));
 }
+void Window::textInput(bool enabled) {
+    input_.setTextInput(enabled);
+    if(SDL_TextInputActive(window_)!=enabled)
+        check(enabled?SDL_StartTextInput(window_):SDL_StopTextInput(window_));
+    check(SDL_SetWindowRelativeMouseMode(window_,input_.captured()));
+}
+void Window::clipboard(std::string_view text) { check(SDL_SetClipboardText(std::string(text).c_str())); }
 void Window::pointerMode(bool enabled) {
     input_.setPointerMode(enabled);
     check(SDL_SetWindowRelativeMouseMode(window_,input_.captured()));
@@ -34,6 +41,13 @@ Input Window::poll() {
             check(SDL_SetWindowRelativeMouseMode(window_, input_.captured()));
     }
     auto input=input_.consume();
+    if(input.text.paste) {
+        const std::unique_ptr<char,decltype(&SDL_free)> pasted(SDL_GetClipboardText(),SDL_free);
+        if(pasted) {
+            const auto size=std::char_traits<char>::length(pasted.get());
+            if(size<=4096) input.text.text+=pasted.get();
+        }
+    }
     int logicalWidth{},logicalHeight{};check(SDL_GetWindowSize(window_,&logicalWidth,&logicalHeight));
     const auto [pixelWidth,pixelHeight]=pixelSize();
     if(logicalWidth>0&&logicalHeight>0&&pixelWidth>0&&pixelHeight>0) {

@@ -59,6 +59,19 @@ struct LivingWorld::Impl {
         const auto e=entities.create();entities.emplace<Identity>(e,nextId++);entities.emplace<Motion>(e,feet);return e;
     }
 };
+std::span<const CreatureDefinition> creatureDefinitions() {
+    static constexpr std::array<CreatureDefinition,2> definitions{{
+        {"voxelcraft:grazer",CreatureKind::Grazer,{"voxelcraft:herbivore"}},
+        {"voxelcraft:stalker",CreatureKind::Stalker,{"voxelcraft:hostile"}}}};
+    return definitions;
+}
+const CreatureDefinition* findCreature(std::string_view identifier) {
+    for(const auto& definition:creatureDefinitions()) {
+        if(definition.identifier==identifier) return &definition;
+        for(const auto alias:definition.aliases) if(alias==identifier) return &definition;
+    }
+    return nullptr;
+}
 LivingWorld::LivingWorld(std::uint64_t seed):impl_(std::make_unique<Impl>(seed)) {}
 LivingWorld::~LivingWorld()=default;
 std::size_t LivingWorld::creatureCount() const { return impl_->entities.view<Creature>().size(); }

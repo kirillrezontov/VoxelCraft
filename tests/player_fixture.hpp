@@ -6,7 +6,7 @@ namespace vc::test {
 // Genuine old layouts, independent of the current encoder and its append-only
 // fields. Fixtures deliberately contain no actors or mods.
 inline std::string legacyPlayer(unsigned version,const PlayerSaveState& state={}) {
-    if(version<3||version>8) throw std::invalid_argument("Legacy fixture version outside 3..8");
+    if(version<3||version>9) throw std::invalid_argument("Legacy fixture version outside 3..9");
     binary::Writer out;out.raw("VCPLAYER");out.u32(version);
     for(int axis=0;axis<3;++axis) out.f64(state.camera.position[axis]);
     out.f64(state.camera.yaw);out.f64(state.camera.pitch);out.u32(state.flying?1:0);out.u32(state.selectedSlot);
@@ -22,6 +22,7 @@ inline std::string legacyPlayer(unsigned version,const PlayerSaveState& state={}
             out.text(profile.name);for(int axis=0;axis<3;++axis) out.f64(profile.camera.position[axis]);
             out.f64(profile.camera.yaw);out.f64(profile.camera.pitch);out.u32(profile.flying?1:0);out.u32(profile.selectedSlot);
             for(const auto& name:profile.hotbar) out.text(name);
+            if(version>=9) { out.u32(profile.health);for(const auto& stack:profile.items) { out.text(stack.identifier);out.u16(stack.count);out.u16(stack.durability); } }
         }
     }
     return {reinterpret_cast<const char*>(out.bytes.data()),out.bytes.size()};

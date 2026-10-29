@@ -7,6 +7,7 @@
 namespace vc {
 namespace {
 void validate(const PlayerSaveState& player) {
+    validateSpawnPoint(player.spawnPoint);
     validateActors(player.actors);
     validateMods(player.mods);
     validateProfiles(player.profiles);validatePlayerPose(player.camera);validateHotbar(player.hotbar,player.selectedSlot);
@@ -17,7 +18,7 @@ void validate(const PlayerSaveState& player) {
 }
 std::string encodePlayer(const PlayerSaveState& player) {
     validate(player);
-    binary::Writer out;out.raw("VCPLAYER");out.u32(9);
+    binary::Writer out;out.raw("VCPLAYER");out.u32(10);
     for(int axis=0;axis<3;++axis) out.f64(player.camera.position[axis]);
     out.f64(player.camera.yaw);out.f64(player.camera.pitch);out.u32(player.flying?1:0);
     out.u32(player.selectedSlot);
@@ -40,12 +41,13 @@ std::string encodePlayer(const PlayerSaveState& player) {
     }
     out.u32(static_cast<std::uint32_t>(player.profiles.size()));
     for(const auto& profile:player.profiles) writeProfile(out,profile);
+    writeSpawnPoint(out,player.spawnPoint);
     return {reinterpret_cast<const char*>(out.bytes.data()),out.bytes.size()};
 }
 PlayerSaveState decodePlayer(std::string_view data) {
     binary::Reader in({reinterpret_cast<const std::uint8_t*>(data.data()),data.size()});
     in.magic("VCPLAYER");const auto version=in.u32();
-    if(version<1||version>9) throw std::runtime_error("Unsupported player save version");
+    if(version<1||version>10) throw std::runtime_error("Unsupported player save version");
     PlayerSaveState player;
     for(int axis=0;axis<3;++axis) player.camera.position[axis]=in.f64();
     player.camera.yaw=in.f64();player.camera.pitch=in.f64();
@@ -89,8 +91,9 @@ PlayerSaveState decodePlayer(std::string_view data) {
     }
     if(version>=8) {
         const auto count=in.u32();if(count>maxSavedProfiles) throw std::runtime_error("Too many saved player profiles");
-        player.profiles.reserve(count);for(std::uint32_t i=0;i<count;++i) player.profiles.push_back(readProfile(in,version>=9));
+        player.profiles.reserve(count);for(std::uint32_t i=0;i<count;++i) player.profiles.push_back(readProfile(in,version>=9,version>=10));
     }
+    if(version>=10) player.spawnPoint=readSpawnPoint(in);
     in.finish();validate(player);
     return player;
 }

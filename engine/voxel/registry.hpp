@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/vec3.hpp>
+#include "engine/core/content_presentation.hpp"
 #include "engine/renderer/texture.hpp"
 #include <array>
 #include <cstdint>
@@ -22,6 +23,7 @@ struct BlockDefinition {
     bool fluid{};
     std::uint8_t emission{};
     float opacity{1};
+    ContentPresentation presentation{};
 };
 class BlockRegistry {
 public:

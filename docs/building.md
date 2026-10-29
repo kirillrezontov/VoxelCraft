@@ -226,3 +226,25 @@ update/draw/upload CPU times (draw includes fence/present waits), draw calls,
 triangles, loaded/visible chunks, pending jobs, generation/mesh timings, cached edit
 bytes, save duration and connected network byte counters. Logging is periodic,
 not per-frame. No GPU timer-query measurements are claimed.
+
+## v0.8.2 fonts, console and packages
+
+The pinned stb_truetype header is vendored with its upstream license. CMake embeds
+bundled DejaVu Sans/Mono font bytes once; it needs no FreeType development package,
+OS font installation or runtime download. MSVC keeps `/utf-8` and the existing
+UTF-8 process manifest. Windows stdin uses bounded native console events/pipe
+reads; POSIX stdin uses zero-timeout polling. Headless code links neither SDL nor
+Vulkan. New UI/parser tests also run without a display.
+
+`cmake --build --preset release`, `ctest --preset release`, then
+`cpack --config build/release/CPackConfig.cmake -C Release` creates separate 0.8.2-rc1
+client/server archives. Run `python3 tests/package_smoke.py --gpu
+build/release/packages/*.tar.gz` on a Vulkan desktop to validate extracted archives
+from an unrelated directory. Client archives include `assets/fonts`, shader SPIR-V,
+DejaVu/stb notices and UI/command docs; fonts remain embedded for reliable lookup.
+`cmake --build --preset graphics` and `ctest --preset graphics` include the
+Unicode/console/command test with resize requests for 1280×720, 1920×1080 and
+2560×1440. Compositors may constrain actual sizes; the test reports both.
+CPU layout/font checks validate those exact viewports independently.
+See [the implementation record](v0.8.2-implementation.md) for executed checks;
+Windows CI configuration is maintained but local Windows execution is unverified.

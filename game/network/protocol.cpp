@@ -1,5 +1,6 @@
 #include "game/network/protocol.hpp"
 #include "game/network/identity.hpp"
+#include "engine/core/utf8.hpp"
 #include "game/simulation/day_cycle.hpp"
 #include <algorithm>
 #include <cmath>
@@ -43,6 +44,8 @@ void validInput(const Input& input) {
     for(const auto value:{input.forward,input.right,input.up}) if(!std::isfinite(value)||std::abs(value)>1) throw std::runtime_error("Invalid movement intent");
 }
 void validState(const State& state) {
+    validateHotbar(state.hotbar,state.selectedSlot);
+    if(state.permission>commands::Permission::Administrator) throw std::runtime_error("Invalid client permission snapshot");
     time(state.worldTime);if(state.players.size()>maxPlayers) throw std::runtime_error("Too many connected player records");
     std::set<std::uint64_t> ids;std::set<std::string> names;
     for(const auto& peer:state.players) {
@@ -61,8 +64,11 @@ void validState(const State& state) {
 void validInventory(const InventoryAction& action) {
     if(action.from>=36||action.to>=36||action.recipe>=8192) throw std::runtime_error("Inventory action exceeds bounds");
     switch(action.kind) {
-    case InventoryActionKind::Swap: case InventoryActionKind::TransferOne:
+    case InventoryActionKind::Swap: case InventoryActionKind::TransferOne: case InventoryActionKind::TransferHalf: case InventoryActionKind::TransferAll:
         if(action.recipe) throw std::runtime_error("Unexpected recipe in slot action");
+        break;
+    case InventoryActionKind::QuickTransfer:
+        if(action.to||action.recipe) throw std::runtime_error("Invalid quick transfer action");
         break;
     case InventoryActionKind::MoveToBackpack:
         if(action.from>=9||action.to||action.recipe) throw std::runtime_error("Invalid backpack action");
@@ -89,7 +95,7 @@ SavedActor actor(binary::Reader& in) {
 Message messageType(std::span<const std::uint8_t> bytes) {
     if(bytes.size()>net::maxFrameBytes) throw std::runtime_error("Gameplay packet exceeds limit");
     binary::Reader in(bytes);const auto value=in.u32();
-    if(value<1||value>static_cast<std::uint32_t>(Message::Inventory)) throw std::runtime_error("Unknown gameplay packet type");
+    if(value<1||value>static_cast<std::uint32_t>(Message::CommandReply)) throw std::runtime_error("Unknown gameplay packet type");
     return static_cast<Message>(value);
 }
 std::uint64_t contentFingerprint(const voxel::BlockRegistry& blocks,const ItemRegistry& items,
@@ -108,6 +114,7 @@ std::uint64_t contentFingerprint(const voxel::BlockRegistry& blocks,const ItemRe
         const auto& item=items.definition(static_cast<ItemId>(i));out.text(item.identifier);
         out.text(item.block?blocks.definition(*item.block).identifier:"");out.u16(item.stackSize);out.u16(item.durability);
         out.u32(static_cast<std::uint32_t>(item.tool));out.u32(item.tier);out.f64(item.miningSpeed);
+        out.text(item.presentation.name);out.text(item.presentation.description);out.text(item.presentation.category);out.text(item.presentation.icon);out.u32(item.presentation.iconTile.value_or(0));
     }
     out.u32(static_cast<std::uint32_t>(recipes.size()));
     for(const auto& recipe:recipes) {
@@ -117,6 +124,27 @@ std::uint64_t contentFingerprint(const voxel::BlockRegistry& blocks,const ItemRe
     const auto packs=mods.save();out.u32(static_cast<std::uint32_t>(packs.size()));
     for(const auto& mod:packs) { out.text(mod.id);out.text(mod.version);out.u32(mod.stateVersion); }
     const auto image=mods.atlas().image();out.u32(image.width);out.u32(image.height);out.u64(binary::checksum(image.pixels));return binary::checksum(out.bytes);
+}
+binary::Bytes encode(const CommandRequest& message) {
+    if(!message.id||message.text.size()>commands::maxCommandBytes||!utf8::valid(message.text)) throw std::invalid_argument("Invalid command request");
+    auto out=packet(Message::Command);out.u64(message.id);out.text(message.text);return out.bytes;
+}
+CommandRequest decodeCommand(std::span<const std::uint8_t> bytes) {
+    if(bytes.size()>commands::maxCommandBytes+16) throw std::runtime_error("Command packet exceeds limit");
+    auto in=reader(bytes,Message::Command);CommandRequest message;message.id=in.u64();message.text=in.text();in.finish();
+    if(!message.id||message.text.size()>commands::maxCommandBytes||!utf8::valid(message.text)) throw std::runtime_error("Invalid command request");
+    return message;
+}
+binary::Bytes encode(const CommandReply& message) {
+    if(!message.id||message.result.code>commands::Code::InternalFailure||message.result.lines.size()>commands::maxResultLines) throw std::invalid_argument("Invalid command result");
+    auto out=packet(Message::CommandReply);out.u64(message.id);out.u32(static_cast<std::uint32_t>(message.result.code));out.u32(static_cast<std::uint32_t>(message.result.lines.size()));
+    for(const auto& line:message.result.lines) { if(line.size()>commands::maxResultBytes||!utf8::valid(line)) throw std::invalid_argument("Invalid command output");out.text(line); }return out.bytes;
+}
+CommandReply decodeCommandReply(std::span<const std::uint8_t> bytes) {
+    auto in=reader(bytes,Message::CommandReply);CommandReply message;message.id=in.u64();message.result.code=static_cast<commands::Code>(in.u32());
+    const auto count=in.u32();if(!message.id||message.result.code>commands::Code::InternalFailure||count>commands::maxResultLines) throw std::runtime_error("Invalid command result");
+    for(std::uint32_t i=0;i<count;++i) { auto line=in.text();if(line.size()>commands::maxResultBytes||!utf8::valid(line)) throw std::runtime_error("Invalid command output");message.result.lines.push_back(std::move(line)); }
+    in.finish();return message;
 }
 binary::Bytes encode(const Hello& message) {
     if(!validPlayerName(message.name)) throw std::invalid_argument("Invalid joining player name");
@@ -141,7 +169,7 @@ binary::Bytes encode(const Welcome& message) {
 Welcome decodeWelcome(std::span<const std::uint8_t> bytes) {
     auto in=reader(bytes,Message::Welcome);in.magic("VCNET");if(in.u32()!=protocolVersion) throw std::runtime_error("Unsupported multiplayer protocol version");
     Welcome message;message.id=in.u64();message.tick=in.u64();message.metadata.seed=in.u64();message.metadata.bounds.minY=in.i64();message.metadata.bounds.maxY=in.i64();
-    message.metadata.generatorVersion=in.u32();message.radius=in.u32();message.worldTime=in.f64();message.profile=readProfile(in);
+    message.metadata.generatorVersion=in.u32();message.radius=in.u32();message.worldTime=in.f64();message.profile=readProfile(in,true,true);
     const auto survival=in.u32();if(survival>1) throw std::runtime_error("Invalid server game mode");message.survival=survival==1;
     const auto count=in.u32();if(!count||count>maxNetworkBlocks) throw std::runtime_error("Server block palette exceeds limit");
     message.blocks.reserve(count);for(std::uint32_t i=0;i<count;++i) message.blocks.push_back(in.text());in.finish();validWelcome(message);return message;
@@ -169,6 +197,8 @@ binary::Bytes encode(const State& message) {
         const auto& s=*message.survival;out.u32(s.health);out.u32(s.selectedSlot);out.f64(s.miningProgress);out.u32(s.mining?1:0);
         for(const auto& item:s.items) { out.text(item.identifier);out.u16(item.count);out.u16(item.durability); }
     }
+    for(const auto& name:message.hotbar) out.text(name);
+    out.u32(message.selectedSlot);out.u64(message.poseRevision);out.u32(static_cast<std::uint32_t>(message.permission));
     return out.bytes;
 }
 State decodeState(std::span<const std::uint8_t> bytes) {
@@ -187,6 +217,8 @@ State decodeState(std::span<const std::uint8_t> bytes) {
         const auto mining=in.u32();if(mining>1) throw std::runtime_error("Invalid mining flag");s.mining=mining==1;
         for(auto& item:s.items) { item.identifier=in.text();item.count=in.u16();item.durability=in.u16(); }
     }
+    for(auto& name:message.hotbar) name=in.text();
+    message.selectedSlot=in.u32();message.poseRevision=in.u64();message.permission=static_cast<commands::Permission>(in.u32());
     in.finish();validState(message);return message;
 }
 binary::Bytes encode(const InventoryAction& message) {

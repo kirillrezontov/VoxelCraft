@@ -22,7 +22,7 @@ std::array<std::uint8_t,4> pixel(const vc::ImageRgba& image,std::uint32_t x,std:
 }
 TEST(ContentAtlas, BuiltinPixelsAndAliasesRemainExact) {
     const vc::ContentAtlas atlas;EXPECT_EQ(atlas.image().pixels,vc::builtinAtlas().pixels);
-    EXPECT_EQ(atlas.layout().width(),vc::builtinAtlasLayout().width());EXPECT_EQ(atlas.size(),17u);
+    EXPECT_EQ(atlas.layout().width(),vc::builtinAtlasLayout().width());EXPECT_EQ(atlas.size(),23u);
     EXPECT_EQ(atlas.require("stone"),vc::tiles::stone);EXPECT_EQ(atlas.require("voxelcraft:stone"),vc::tiles::stone);
     EXPECT_FALSE(atlas.find("missing:texture"));EXPECT_THROW(atlas.require("missing:texture"),std::invalid_argument);
 }
@@ -30,7 +30,7 @@ TEST(ContentAtlas, AppendedTilesRepackAcrossRowsAndPreserveGutters) {
     vc::ContentAtlas atlas;const auto source=tileImage();
     for(int i=0;i<18;++i) atlas.add("test:tile_"+std::to_string(i),source);
     const auto layout=atlas.layout();const auto image=atlas.image();image.validate();
-    EXPECT_EQ(atlas.size(),35u);EXPECT_EQ(layout.width(),32*18u);EXPECT_EQ(layout.height(),2*18u);
+    EXPECT_EQ(atlas.size(),41u);EXPECT_EQ(layout.width(),32*18u);EXPECT_EQ(layout.height(),2*18u);
     const auto origin=layout.tileOrigin(atlas.require("test:tile_17"));
     for(std::uint32_t x=0;x<16;++x) for(std::uint32_t y=0;y<16;++y)
         EXPECT_EQ(pixel(image,origin.x+x,origin.y+y),pixel(source,x,y));
@@ -50,7 +50,7 @@ TEST(ContentAtlas, InvalidDuplicateAndOverflowDefinitionsDoNotMutateAtlas) {
     vc::ContentAtlas atlas;const auto image=tileImage();
     EXPECT_THROW(atlas.add("missing_namespace",image),std::invalid_argument);
     EXPECT_THROW(atlas.add("voxelcraft:stone",image),std::invalid_argument);
-    EXPECT_THROW(atlas.add("test:bad",{1,1,{1,2,3,4}}),std::invalid_argument);EXPECT_EQ(atlas.size(),17u);
+    EXPECT_THROW(atlas.add("test:bad",{1,1,{1,2,3,4}}),std::invalid_argument);EXPECT_EQ(atlas.size(),23u);
     for(std::size_t i=atlas.size();i<vc::ContentAtlas::maxTiles;++i) atlas.add("test:tile_"+std::to_string(i),image);
     EXPECT_THROW(atlas.add("test:overflow",image),std::runtime_error);EXPECT_EQ(atlas.size(),vc::ContentAtlas::maxTiles);
     EXPECT_FALSE(atlas.find("test:overflow"));

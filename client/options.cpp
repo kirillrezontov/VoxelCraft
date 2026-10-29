@@ -59,6 +59,7 @@ Options parseOptions(int argc, char** argv) {
         }
         else if (flag == "--no-settings") options.noSettings=true;
         else if (flag == "--fov") options.fieldOfView=number<double>(value());
+        else if (flag == "--ui-scale") options.uiScale=number<double>(value());
         else if (flag == "--sensitivity") options.mouseSensitivity=number<double>(value());
         else if (flag == "--invert-y") options.invertY=true;
         else if (flag == "--normal-y") options.invertY=false;
@@ -103,6 +104,7 @@ Options parseOptions(int argc, char** argv) {
     vc::GameSettings check;
     if(options.fieldOfView) check.fieldOfView=*options.fieldOfView;
     if(options.mouseSensitivity) check.mouseSensitivity=*options.mouseSensitivity;
+    if(options.uiScale) check.uiScale=*options.uiScale;
     check.validate();
     return options;
 }

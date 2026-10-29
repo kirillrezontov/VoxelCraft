@@ -16,7 +16,7 @@ struct Options {
     bool fullscreen{},vsync{true};
     unsigned frameLimit{};
     bool smoke{}, help{}, requireValidation{}, fly{}, noSave{}, seedSpecified{}, minSpecified{}, maxSpecified{},noSettings{};
-    std::optional<double> fieldOfView,mouseSensitivity;
+    std::optional<double> fieldOfView,mouseSensitivity,uiScale;
     std::optional<bool> invertY;
     std::optional<bool> survival;
     std::optional<std::uint32_t> generatorVersion;

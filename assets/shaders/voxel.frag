@@ -9,9 +9,11 @@ layout(location = 5) in float vertexOpacity;
 layout(location = 6) in float viewDistance;
 layout(push_constant) uniform Camera { mat4 viewProjection; vec4 offset; vec4 sun; vec4 sky; vec4 fog; } camera;
 layout(set = 0, binding = 0) uniform sampler2D atlas;
+layout(set = 0, binding = 1) uniform sampler2D fontAtlas;
 layout(location = 0) out vec4 outColor;
 void main() {
-    if(untextured>0.5&&untextured<1.5) { outColor=vec4(vertexColor,1);return; }
+    if(atlasTile.z<0) { outColor=vec4(vertexColor,vertexOpacity*texture(fontAtlas,textureUv).a);return; }
+    if(untextured>0.5&&untextured<1.5) { outColor=vec4(vertexColor,vertexOpacity);return; }
     vec2 sampleUv=atlasTile.z>0?atlasTile.xy+fract(textureUv)*atlasTile.zw:textureUv;
     vec4 albedo=untextured>2.5?vec4(vertexColor,vertexOpacity):texture(atlas,sampleUv)*vec4(vertexColor,vertexOpacity);
     if(untextured>1.5&&untextured<2.5) { outColor=albedo;return; } // Textured UI is unlit and unfogged.

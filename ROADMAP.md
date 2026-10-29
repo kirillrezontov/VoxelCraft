@@ -1,6 +1,27 @@
 # VoxelCraft Development Roadmap
 
-## Current Milestone: v0.8.1 — Stabilization (release candidate)
+## Current Milestone: v0.8.2 — UI/UX and Developer Console (release candidate)
+
+- [x] Baseline audit/build and 185-test regression baseline
+- [x] Licensed embedded sans/mono TrueType fonts, UTF-8/Cyrillic, bounded glyph cache
+- [x] Shared theme, constrained layouts, CPU widgets, focus, tooltips and retained HUD
+- [x] Full ItemRegistry creative catalog, pickaxes, search/categories and mod metadata/icons
+- [x] Authoritative drag/split/quick transfer, read-only recipe eligibility and crafting UI
+- [x] SDL text console, selection/clipboard, bounded history/output and live completion
+- [x] Shared parser/registry and real local/server gameplay/admin commands
+- [x] Per-player modes, safe teleport/spawn points, retained counted inventory and durability
+- [x] Protocol 4 bounded requests/replies, authenticated persisted roles and audited operations
+- [x] Nonblocking headless stdin console, EOF/service mode and graceful signal shutdown
+- [x] Solo Pause/Settings simulation freeze, multiplayer input isolation and persisted UI scale
+- [x] Player payload 10 migration from 1..9; world format 1 and mod API 1 retained
+- [x] CPU/network/restart/identity/flood regressions and SDL/Vulkan console playtest
+- [x] GCC/Clang/sanitizer builds, licensed asset packaging and user/developer documentation
+- [ ] Windows/MSVC execution and sustained human cross-platform playtesting (unverified locally)
+
+Detailed task coverage and acceptance evidence: [v0.8.2 implementation record](docs/v0.8.2-implementation.md).
+Weather and full Lua command registration are optional, explicitly deferred.
+
+## v0.8.1 — Stabilization (historical release-candidate foundation)
 
 - [x] Baseline audit and complete CPU/CLI regression run
 - [x] Profile-specific private-server credentials; explicit trusted-LAN mode
@@ -108,7 +129,7 @@ sustained human playtesting and Windows execution remain pending.
 
 Execute the Windows/MSVC workflow and manual cross-platform acceptance matrix.
 Resolve the release blockers in [the stabilization record](docs/v0.8.1-stabilization.md)
-before marking v0.8.1 stable.
+and the [v0.8.2 acceptance record](docs/v0.8.2-implementation.md) before a stable release.
 
 ## v0.3 — Persistent Sandbox (implemented development foundation)
 

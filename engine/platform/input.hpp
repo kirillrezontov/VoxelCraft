@@ -1,6 +1,7 @@
 #pragma once
 #include <SDL3/SDL_events.h>
 #include <array>
+#include "engine/ui/text_edit.hpp"
 
 namespace vc {
 struct Input {
@@ -14,6 +15,9 @@ struct Input {
     int scroll{};
     float forward{}, right{}, up{}, mouseX{}, mouseY{};
     float cursorX{}, cursorY{};
+    int console{}; // 1 slash, 2 chat, 3 expanded; text itself comes from SDL.
+    bool pause{},primaryRelease{},primaryHeld{},shift{},consoleCapturedBefore{};
+    ui::TextInput text;
 };
 
 // Event state is independent of window creation and can be tested without a display.
@@ -22,12 +26,14 @@ public:
     void process(const SDL_Event& event);
     void setCaptured(bool captured);
     void setPointerMode(bool enabled);
+    void setTextInput(bool enabled);
+    bool textInput() const { return textInput_; }
     bool captured() const { return captured_; }
     Input consume();
 private:
     void resetActions();
     bool captured_{}, leftHeld_{}, rightHeld_{};
-    bool pointerMode_{};
+    bool pointerMode_{},textInput_{};
     bool leftEditArmed_{};
     float cursorX_{},cursorY_{},wheelRemainder_{};
     std::array<bool, SDL_SCANCODE_COUNT> keys_{};

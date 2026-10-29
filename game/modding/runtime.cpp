@@ -76,12 +76,25 @@ void textures(const Pack& pack,ContentAtlas& atlas) {
         atlas.add(id,loadPngTile(assetPath(pack,data.at("file").get<std::string>())));
     }
 }
-void blocks(const Pack& pack,voxel::BlockRegistry& registry,const ContentAtlas& atlas) {
+ContentPresentation presentation(const Json& data,const ContentAtlas& atlas,std::vector<std::string>& diagnostics) {
+    ContentPresentation result;result.name=data.value("name",std::string{});result.description=data.value("description",std::string{});
+    result.category=data.value("category",std::string{});result.icon=data.value("icon",std::string{});
+    validatePresentation(result);
+    if(!result.icon.empty()) {
+        result.iconTile=atlas.find(result.icon);
+        if(!result.iconTile) {
+            result.iconTile=tiles::missingItem;const auto message="Missing item icon "+result.icon+"; using fallback";
+            if(std::ranges::find(diagnostics,message)==diagnostics.end()) diagnostics.push_back(message);
+        }
+    }
+    return result;
+}
+void blocks(const Pack& pack,voxel::BlockRegistry& registry,const ContentAtlas& atlas,std::vector<std::string>& diagnostics) {
     if(!pack.content.contains("blocks")) return;
     const auto& definitions=pack.content.at("blocks");
     if(!definitions.is_array()||definitions.size()>128) throw std::runtime_error("Mod blocks must be an array of at most 128 definitions");
     for(const auto& data:definitions) {
-        keys(data,{"id","color","solid","opaque","fluid","emission","opacity","texture","face_textures","mining"});
+        keys(data,{"id","color","solid","opaque","fluid","emission","opacity","texture","face_textures","mining","name","description","category","icon"});
         voxel::BlockDefinition block;block.identifier=data.at("id").get<std::string>();own(pack.saved.id,block.identifier);
         block.opaque=data.value("opaque",true);block.solid=data.value("solid",true);block.fluid=data.value("fluid",false);
         if(data.contains("emission")) block.emission=static_cast<std::uint8_t>(integer(data.at("emission"),0,15));
@@ -96,7 +109,7 @@ void blocks(const Pack& pack,voxel::BlockRegistry& registry,const ContentAtlas& 
             const auto& faces=data.at("face_textures");if(!faces.is_array()||faces.size()!=6) throw std::runtime_error("face_textures requires six texture names");
             for(std::size_t i=0;i<6;++i) block.faceTextures[i]=atlas.require(faces.at(i).get<std::string>());
         }
-        registry.add(std::move(block));
+        block.presentation=presentation(data,atlas,diagnostics);registry.add(std::move(block));
     }
 }
 struct Edit { voxel::Position position;voxel::BlockId block; };
@@ -319,7 +332,7 @@ ModRuntime::ModRuntime(const std::filesystem::path& root,voxel::BlockRegistry& r
         catch(const std::exception& error) { throw std::runtime_error("Mod "+pack.saved.id+": "+error.what()); }
     }
     for(const auto& pack:impl_->packs) {
-        try { blocks(pack,next,impl_->atlas);const auto script=pack.directory/"init.lua";impl_->scripts.push_back(std::filesystem::exists(script)?std::make_unique<Script>(script):nullptr); }
+        try { blocks(pack,next,impl_->atlas,impl_->diagnostics);const auto script=pack.directory/"init.lua";impl_->scripts.push_back(std::filesystem::exists(script)?std::make_unique<Script>(script):nullptr); }
         catch(const std::exception& error) { throw std::runtime_error("Mod "+pack.saved.id+": "+error.what()); }
     }
     auto trial=builtinItems(next);auto recipes=builtinRecipes(trial);installItems(trial,next,recipes);
@@ -331,7 +344,7 @@ void ModRuntime::installItems(ItemRegistry& items,const voxel::BlockRegistry& re
     for(const auto& pack:impl_->packs) if(pack.content.contains("items")) {
         const auto& definitions=pack.content.at("items");if(!definitions.is_array()||definitions.size()>128) throw std::runtime_error("Mod items must be an array of at most 128 definitions");
         for(const auto& data:definitions) {
-            keys(data,{"id","block","stack_size","durability","tool","tier","mining_speed"});
+            keys(data,{"id","block","stack_size","durability","tool","tier","mining_speed","name","description","category","icon"});
             ItemDefinition item;item.identifier=data.at("id").get<std::string>();own(pack.saved.id,item.identifier);
             if(data.contains("block")) item.block=registry.require(data.at("block").get<std::string>());
             if(data.contains("stack_size")) item.stackSize=static_cast<std::uint16_t>(integer(data.at("stack_size"),1,64));
@@ -339,7 +352,7 @@ void ModRuntime::installItems(ItemRegistry& items,const voxel::BlockRegistry& re
             const auto tool=data.value("tool",std::string("none"));if(tool!="none"&&tool!="pickaxe") throw std::runtime_error("Unknown mod tool kind");
             item.tool=tool=="pickaxe"?ToolKind::Pickaxe:ToolKind::None;
             if(data.contains("tier")) item.tier=integer(data.at("tier"),0,16);
-            item.miningSpeed=data.value("mining_speed",1.0);next.add(std::move(item));
+            item.miningSpeed=data.value("mining_speed",1.0);item.presentation=presentation(data,impl_->atlas,impl_->diagnostics);next.add(std::move(item));
         }
     }
     for(const auto& pack:impl_->packs) if(pack.content.contains("recipes")) {

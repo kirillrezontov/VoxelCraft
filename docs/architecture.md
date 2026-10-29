@@ -23,7 +23,7 @@ surface are destroyed before SDL's window and subsystem.
 | `game/player` | Camera, walking/free flight, fixed-step player controller | GLM, CPU collision; no SDL or Vulkan |
 | `game/gameplay` | Placement/destruction rules and player overlap rejection | Voxel storage, CPU rays/collision; no SDL or Vulkan |
 | `game/content` | Built-in block registration and procedural atlas pixels | Voxel registry, CPU render data |
-| `game/ui` | Creative catalog/hotbar interaction, pixel-scaled HUD geometry and built-in bitmap font | Gameplay, CPU mesh/atlas data; no SDL/Vulkan |
+| `game/ui` | Themed screens, item catalog, console, CPU widgets and cached TrueType HUD geometry | Gameplay, CPU mesh/atlas data; no SDL/Vulkan |
 
 The generator never calls renderer APIs. Static voxels are contiguous 16-bit IDs,
 not entities or heap objects. The mesher consumes chunks and adjacent world data,
@@ -188,23 +188,22 @@ See [ADR 0003](decisions/0003-interactive-world.md) for milestone scope and owne
 
 ## Creative inventory and HUD
 
-The creative catalog enumerates registered non-air blocks and assigns them to nine
-optional hotbar entries. Placement still runs through the existing gameplay rules;
-empty slots cannot place. These are infinite creative materials, not survival item
-stacks. Hotbar names and selected slot persist in player payload version 2; the
-version 1 selected-material payload migrates into slot zero.
+The creative catalog derives from ItemRegistry and includes blocks, ordinary items,
+tools and mod-defined items. Nine non-consuming item assignments persist by names.
+Unknown saved assignments retain missing-item entries without inventing blocks.
+Counted stacks and durability remain exclusively in SurvivalInventory.
 
-The UI controller consumes platform-independent menu actions, click positions and
-wheel/number selection. Opening a menu switches the platform into pointer mode;
-clicks then target UI and cannot recapture/edit terrain. Closing with E/Escape
-recaptures after clearing held movement state. SDL logical pointer coordinates are
-converted to window pixels for high-DPI hit testing. Gravity continues in menus.
+The CPU controller owns screen/search/focus/drag state; SandboxUiLayout owns
+constrained scaling. Separate view functions paint HUD, inventory, crafting,
+settings, pause and console. SDL translates text events and navigation, with
+logical-to-pixel pointer conversion. Menus isolate gameplay input. Solo Pause and
+Settings freeze simulation; multiplayer menus only suspend local input.
 
-The game generates colored/font geometry and textured cube icons. Vulkan receives
-generic HUD meshes, rendered through a separate depth-disabled pipeline after
-terrain. The renderer contains no inventory rules. HUD buffers rebuild only when
-menu state, assignments, status or viewport dimensions change. The procedural
-bitmap font and icons require no system font, image decoder or new dependency.
+The UI uses embedded licensed DejaVu fonts, a bounded stb_truetype atlas and
+clipped UTF-8 geometry. Vulkan receives generic HUD meshes and a separate font
+sampler at the frame fence. Geometry persists until visible state changes; only
+visible console output and short notification transitions rebuild. Item icons use
+the content atlas. See [the UI design](v0.8.2-ui-design.md) for layout/input details.
 
 ## Survival foundation
 
@@ -355,3 +354,20 @@ A single server thread owns world/player/mod/simulation state; network clients
 send only validated intent/transactions. Platform file sync and Windows UTF-8
 process configuration remain outside gameplay. CPack installs separate Client and
 Server components, with detected redistributables, licenses and compiled shaders.
+
+## v0.8.2 shared commands and authority
+
+`game/commands` provides bounded parsing, typed errors, registry metadata,
+permission filtering, completion and reusable callbacks. Context contains trusted
+references to existing world/player/inventory/actor/day-cycle services and narrow
+save/broadcast/administration sinks. Local owner, remote requests and server stdin
+use these same definitions at their simulation mutation boundary. Gameplay has no
+Vulkan or UI dependency. C++ definitions can be extended without parser changes;
+full Lua command registration remains optional future work.
+
+Protocol 4 adds sequenced command requests and structured replies, mode/hotbar/
+pose revisions and server-selected permissions in snapshots. A request cannot
+supply issuer or role. Only authenticated profile keys can receive persisted roles;
+console alone grants/revokes. Resource caps, audit redaction, migration and syntax
+are documented in [commands](v0.8.2-commands.md). Player payload 10 appends explicit
+per-profile mode and spawn fields; versions 1..9 and metadata/regions 1 remain readable.

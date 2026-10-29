@@ -18,6 +18,7 @@ Preferences loadPreferences(const Options& options) {
     }
     if(options.fieldOfView) settings.fieldOfView=*options.fieldOfView;
     if(options.mouseSensitivity) settings.mouseSensitivity=*options.mouseSensitivity;
+    if(options.uiScale) settings.uiScale=*options.uiScale;
     if(options.invertY) settings.invertY=*options.invertY;
     settings.validate();
     return result;

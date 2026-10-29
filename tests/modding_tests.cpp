@@ -321,7 +321,7 @@ TEST_F(Modding, ExternalTextureNamesResolveBeforeBlocksIncludingDependencies) {
     pack(temp.path(),"zzz",R"({"textures":[{"id":"zzz:custom","file":"tile.png"}]})");
     std::filesystem::copy_file(std::filesystem::path(VC_TEST_DATA_DIR)/"tile.png",temp.path()/"zzz"/"tile.png");
     vc::ModRuntime mods(temp.path(),blocks);const auto id=mods.atlas().require("zzz:custom");
-    EXPECT_EQ(mods.atlas().size(),18u);EXPECT_EQ(blocks.definition(blocks.require("aaa:stone")).faceTextures[0],id);
+    EXPECT_EQ(mods.atlas().size(),vc::builtinAtlasLayout().tileCount()+1);EXPECT_EQ(blocks.definition(blocks.require("aaa:stone")).faceTextures[0],id);
     EXPECT_GE(id,vc::builtinAtlasLayout().tileCount());
     vc::voxel::Chunk chunk({0,0,0});chunk.set({1,1,1},blocks.require("aaa:stone"));
     const auto mesh=vc::voxel::meshChunk(chunk,world,blocks,mods.atlas().layout());
@@ -344,4 +344,15 @@ TEST_F(Modding, BadTextureNamespacePathAndSymlinkCannotPartiallyRegisterContent)
         pack(temp.path(),"demo",R"({"textures":[{"id":"demo:tile","file":"escape.png"}]})");
         EXPECT_THROW(vc::ModRuntime(temp.path(),blocks),std::runtime_error);EXPECT_EQ(blocks.size(),before);
     }
+}
+TEST_F(Modding, Utf8PresentationMetadataAndMissingIconsUseDataDrivenFallback) {
+    pack(temp.path(),"demo",R"({
+        "blocks":[{"id":"demo:brick","name":"Кирпич","description":"Test block","category":"building","icon":"stone"}],
+        "items":[{"id":"demo:tool","name":"Молоток","description":"A mod tool","category":"tools","icon":"demo:absent","stack_size":1,"durability":150}]
+    })");
+    vc::ModRuntime mods(temp.path(),blocks);auto loaded=vc::builtinItems(blocks);auto recipes=vc::builtinRecipes(loaded);mods.installItems(loaded,blocks,recipes);
+    const auto& block=loaded.definition(loaded.require("demo:brick"));EXPECT_EQ(block.presentation.name,"Кирпич");EXPECT_EQ(block.presentation.iconTile,mods.atlas().find("stone"));
+    const auto& item=loaded.definition(loaded.require("demo:tool"));EXPECT_EQ(item.presentation.description,"A mod tool");EXPECT_EQ(item.presentation.iconTile,22);
+    const auto diagnostics=mods.takeDiagnostics();ASSERT_EQ(diagnostics.size(),1u);EXPECT_NE(diagnostics[0].find("demo:absent"),std::string::npos);
+    vc::CreativeInventory creative(loaded);const auto filtered=creative.filter("МОЛОТОК",vc::ItemCategory::Tools);ASSERT_EQ(filtered.size(),1u);EXPECT_EQ(filtered[0],loaded.require("demo:tool"));
 }

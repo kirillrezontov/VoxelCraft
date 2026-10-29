@@ -4,11 +4,12 @@
 #include "game/player/profile.hpp"
 #include "game/simulation/entity_data.hpp"
 #include "game/modding/runtime.hpp"
+#include "game/commands/commands.hpp"
 
 namespace vc::netgame {
-inline constexpr std::uint32_t protocolVersion=3;
+inline constexpr std::uint32_t protocolVersion=4;
 inline constexpr std::size_t maxPlayers=8,maxNetworkBlocks=8192;
-enum class Message : std::uint32_t { Hello=1,Welcome,Input,Hotbar,Chunk,Unload,State,Notice,Reject,Save,Goodbye,Inventory };
+enum class Message : std::uint32_t { Hello=1,Welcome,Input,Hotbar,Chunk,Unload,State,Notice,Reject,Save,Goodbye,Inventory,Command,CommandReply };
 enum InputFlags : std::uint32_t { Active=1,Jump=2,ToggleFlight=4,Destroy=8,Place=16,AttackHeld=32,Respawn=64 };
 struct Hello { std::uint64_t fingerprint{};std::string name;std::string identityToken{}; };
 struct Welcome {
@@ -20,6 +21,8 @@ struct Welcome {
     bool survival{};
     std::vector<std::string> blocks;
 };
+struct CommandRequest { std::uint64_t id{};std::string text; };
+struct CommandReply { std::uint64_t id{};commands::Result result; };
 struct Input {
     std::uint64_t sequence{};
     double yaw{},pitch{},forward{},right{},up{};
@@ -46,12 +49,20 @@ struct State {
     std::vector<Peer> players;
     std::vector<SavedActor> actors;
     std::optional<SurvivalSnapshot> survival;
+    std::array<std::string,9> hotbar{};
+    std::uint32_t selectedSlot{};
+    std::uint64_t poseRevision{};
+    commands::Permission permission{commands::Permission::Player};
 };
 struct ChunkUpdate { voxel::Chunk chunk;std::uint64_t revision{}; };
 Message messageType(std::span<const std::uint8_t> bytes);
 // Compute from registered content before loading saved missing-content fallbacks.
 std::uint64_t contentFingerprint(const voxel::BlockRegistry& blocks,const ItemRegistry& items,
     const std::vector<Recipe>& recipes,const MiningRules& mining,const ModRuntime& mods);
+binary::Bytes encode(const CommandRequest& message);
+binary::Bytes encode(const CommandReply& message);
+CommandRequest decodeCommand(std::span<const std::uint8_t> bytes);
+CommandReply decodeCommandReply(std::span<const std::uint8_t> bytes);
 binary::Bytes encode(const Hello& message);
 binary::Bytes encode(const Welcome& message);
 binary::Bytes encode(const Input& message);

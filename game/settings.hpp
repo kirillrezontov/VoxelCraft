@@ -6,6 +6,7 @@ namespace vc {
 struct GameSettings {
     double fieldOfView{75},mouseSensitivity{0.0025};
     bool invertY{};
+    double uiScale{1};
     void validate() const;
     bool operator==(const GameSettings&) const=default;
 };

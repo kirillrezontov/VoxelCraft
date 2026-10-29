@@ -132,3 +132,20 @@ TEST(GameProtocol, SurvivalSnapshotsAndInventoryRequestsAreStrictValueMessages) 
     action={vc::InventoryActionKind::Craft,0,2,1};EXPECT_THROW(vc::netgame::encode(action),std::runtime_error);
     action.kind=static_cast<vc::InventoryActionKind>(99);EXPECT_THROW(vc::netgame::encode(action),std::runtime_error);
 }
+TEST(PlayerProfiles, VersionNineMigrationAndTenPreserveModeSpawnAndCountedTools) {
+    vc::PlayerSaveState state;state.survival=true;state.hotbar[8]="voxelcraft:stone_pickaxe";
+    vc::PlayerProfile profile;profile.name="Alice";profile.health=7;profile.items[0]={"voxelcraft:wooden_pickaxe",1,19};state.profiles={profile};
+    const auto old=vc::decodePlayer(vc::test::legacyPlayer(9,state));ASSERT_EQ(old.profiles.size(),1u);EXPECT_FALSE(old.profiles[0].survivalMode.has_value());EXPECT_FALSE(old.profiles[0].spawnPoint);
+    EXPECT_EQ(old.profiles[0].items,profile.items);EXPECT_EQ(old.profiles[0].health,7u);EXPECT_EQ(old.hotbar,state.hotbar);
+    state.profiles[0].survivalMode=false;state.profiles[0].spawnPoint=glm::dvec3{-32.5,2,-63.5};state.spawnPoint=glm::dvec3{-10.5,1,5.5};
+    const auto current=vc::decodePlayer(vc::encodePlayer(state));EXPECT_EQ(current.spawnPoint,state.spawnPoint);EXPECT_EQ(current.profiles[0].survivalMode,false);
+    EXPECT_EQ(current.profiles[0].spawnPoint,state.profiles[0].spawnPoint);EXPECT_EQ(current.profiles[0].items,profile.items);
+}
+TEST(GameProtocol, CommandsHaveBoundedUtf8SequencedRequestsAndStructuredResults) {
+    const vc::netgame::CommandRequest request{42,"/say \"Привет мир\""};const auto decoded=vc::netgame::decodeCommand(vc::netgame::encode(request));EXPECT_EQ(decoded.id,42u);EXPECT_EQ(decoded.text,request.text);
+    EXPECT_THROW(vc::netgame::encode(vc::netgame::CommandRequest{0,"/list"}),std::exception);
+    EXPECT_THROW(vc::netgame::encode(vc::netgame::CommandRequest{1,std::string(1025,'x')}),std::exception);
+    const vc::netgame::CommandReply reply{42,vc::commands::Result::error(vc::commands::Code::PermissionDenied,"Denied")};
+    const auto result=vc::netgame::decodeCommandReply(vc::netgame::encode(reply));EXPECT_EQ(result.id,42u);EXPECT_EQ(result.result.code,reply.result.code);EXPECT_EQ(result.result.lines,reply.result.lines);
+    auto bytes=vc::netgame::encode(request);bytes.push_back(0);EXPECT_THROW(vc::netgame::decodeCommand(bytes),std::exception);
+}

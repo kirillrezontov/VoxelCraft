@@ -6,6 +6,9 @@
 
 namespace vc {
 enum class CreatureKind { Grazer,Stalker };
+struct CreatureDefinition { std::string_view identifier;CreatureKind kind;std::array<std::string_view,1> aliases; };
+std::span<const CreatureDefinition> creatureDefinitions();
+const CreatureDefinition* findCreature(std::string_view identifier);
 struct ActorView {
     std::uint64_t id{};
     unsigned model{}; // Grazer 0, stalker 1, drop 2.

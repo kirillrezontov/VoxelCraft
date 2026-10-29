@@ -8,7 +8,7 @@
 
 TEST(Inventory, SelectionAssignmentAndEmptySlots) {
     const auto registry=vc::builtinBlocks();vc::CreativeInventory inventory(registry);
-    EXPECT_EQ(inventory.catalog().size(),registry.size()-1);EXPECT_EQ(inventory.selectedBlock(),registry.require("voxelcraft:grass"));
+    EXPECT_EQ(inventory.catalog().size(),inventory.items().size());EXPECT_EQ(inventory.selectedBlock(),registry.require("voxelcraft:grass"));
     inventory.cycle(-1);EXPECT_EQ(inventory.selectedSlot(),8u);EXPECT_FALSE(inventory.selectedBlock());
     inventory.cycle(1);EXPECT_EQ(inventory.selectedSlot(),0u);
     inventory.cycle(std::numeric_limits<int>::min());EXPECT_LT(inventory.selectedSlot(),9u);
@@ -38,7 +38,7 @@ TEST(SandboxUi, CatalogAssignmentClearAndCaptureTransitions) {
     ui.process({.slot=9},1280,720);EXPECT_EQ(inventory.selectedSlot(),8u);
     const auto cell=layout.catalogCell(0);
     ui.process({.primary=true,.x=cell.x+10,.y=cell.y+10},1280,720);
-    EXPECT_EQ(inventory.selectedBlock(),inventory.catalog()[0]);
+    EXPECT_EQ(inventory.selectedItem(),inventory.catalog()[0]);
     const auto slot=layout.hotbarSlot(8);
     ui.process({.secondary=true,.x=slot.x+10,.y=slot.y+10},1280,720);EXPECT_FALSE(inventory.selectedBlock());
     EXPECT_TRUE(ui.process({.close=true},1280,720));EXPECT_FALSE(ui.open());
@@ -54,7 +54,7 @@ TEST(SandboxUi, CatalogPaginationRebuildAndMinimize) {
     ui.process({.toggle=true},800,600);ui.process({.scroll=-1},800,600);EXPECT_EQ(ui.page(),1u);
     const vc::SandboxUiLayout layout(800,600);const auto cell=layout.catalogCell(0);
     ui.process({.primary=true,.x=cell.x+1,.y=cell.y+1},800,600);
-    EXPECT_EQ(inventory.selectedBlock(),inventory.catalog()[32]);
+    EXPECT_EQ(inventory.selectedItem(),inventory.catalog()[32]);
     ui.process({.scroll=std::numeric_limits<int>::min()},800,600);EXPECT_EQ(ui.page(),1u);
     ui.status("SAVED",1);EXPECT_TRUE(ui.rebuild(registry,vc::builtinAtlasLayout(),800,600,2));
     EXPECT_FALSE(ui.rebuild(registry,vc::builtinAtlasLayout(),0,0,3));

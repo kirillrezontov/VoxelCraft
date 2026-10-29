@@ -17,6 +17,9 @@ InventoryActionResult applyInventoryAction(SurvivalInventory& inventory,const In
     bool changed=false;
     switch(action.kind) {
     case InventoryActionKind::Swap: changed=inventory.swap(action.from,action.to);break;
+    case InventoryActionKind::TransferHalf: changed=inventory.transfer(action.from,action.to,static_cast<std::uint16_t>((inventory.slots().at(action.from).count+1)/2),items);break;
+    case InventoryActionKind::TransferAll: changed=inventory.transfer(action.from,action.to,inventory.slots().at(action.from).count,items);break;
+    case InventoryActionKind::QuickTransfer: changed=inventory.quickTransfer(action.from,items);break;
     case InventoryActionKind::TransferOne: changed=inventory.transfer(action.from,action.to,1,items);break;
     case InventoryActionKind::MoveToBackpack: changed=inventory.moveToBackpack(action.from,items);break;
     case InventoryActionKind::Craft:
@@ -32,6 +35,28 @@ InventoryActionResult applyInventoryAction(SurvivalInventory& inventory,const In
     return changed?InventoryActionResult::Changed:InventoryActionResult::NoChange;
 }
 ItemId ItemRegistry::add(ItemDefinition definition) {
+    if(definition.presentation.name.empty()) {
+        definition.presentation.name=definition.identifier.substr(definition.identifier.find(':')+1);
+        bool capitalize=true;
+        for(auto& c:definition.presentation.name) {
+            if(c=='_') { c=' ';capitalize=true; }
+            else if(capitalize) { if(c>='a'&&c<='z') c=static_cast<char>(c-'a'+'A');capitalize=false; }
+        }
+    }
+    if(definition.presentation.category.empty()) {
+        const auto name=definition.identifier;
+        definition.presentation.category=definition.tool!=ToolKind::None?"tools":
+            name=="voxelcraft:raw_meat"?"food":definition.block?
+            (name=="voxelcraft:planks"||name=="voxelcraft:cobblestone"||name=="voxelcraft:lamp"?"building":"natural"):
+            (name=="voxelcraft:stick"||name=="voxelcraft:coal"?"materials":"miscellaneous");
+    }
+    if(!definition.presentation.iconTile&&!definition.block) {
+        constexpr std::array<std::string_view,5> names{"voxelcraft:stick","voxelcraft:coal","voxelcraft:raw_meat","voxelcraft:wooden_pickaxe","voxelcraft:stone_pickaxe"};
+        auto tile=TextureTile{22};
+        for(std::size_t i=0;i<names.size();++i) if(definition.identifier==names[i]) tile=static_cast<TextureTile>(17+i);
+        definition.presentation.iconTile=tile;
+    }
+    validatePresentation(definition.presentation);
     if(!voxel::BlockRegistry::validIdentifier(definition.identifier)||definition.identifier.size()>256)
         throw std::invalid_argument("Invalid item identifier: "+definition.identifier);
     if(ids_.contains(definition.identifier)) throw std::invalid_argument("Duplicate item identifier: "+definition.identifier);
@@ -50,9 +75,15 @@ std::optional<ItemId> ItemRegistry::find(std::string_view name) const {
 ItemId ItemRegistry::require(std::string_view name) const {
     const auto id=find(name);if(!id) throw std::invalid_argument("Unknown item: "+std::string(name));return *id;
 }
+void retainHotbarItems(ItemRegistry& items,const std::array<std::string,9>& names) {
+    for(const auto& name:names) if(!name.empty()&&!items.find(name)) items.add({name,{},64,0,ToolKind::None,0,1,true});
+}
 ItemRegistry builtinItems(const voxel::BlockRegistry& blocks) {
     ItemRegistry items;
-    for(std::size_t id=1;id<blocks.size();++id) items.add({blocks.definition(static_cast<voxel::BlockId>(id)).identifier,static_cast<voxel::BlockId>(id)});
+    for(std::size_t id=1;id<blocks.size();++id) {
+        const auto& block=blocks.definition(static_cast<voxel::BlockId>(id));
+        ItemDefinition item{block.identifier,static_cast<voxel::BlockId>(id)};item.presentation=block.presentation;items.add(std::move(item));
+    }
     items.add({"voxelcraft:stick",{}});items.add({"voxelcraft:coal",{}});
     items.add({"voxelcraft:raw_meat",{}});
     items.add({"voxelcraft:wooden_pickaxe",{},1,59,ToolKind::Pickaxe,1,3});
@@ -142,6 +173,38 @@ bool SurvivalInventory::remove(ItemId item,std::uint16_t amount) {
     }
     return true;
 }
+bool SurvivalInventory::quickTransfer(std::size_t from,const ItemRegistry& registry) {
+    if(from>=slotCount) throw std::out_of_range("Inventory slot outside 0..35");
+    if(slots_[from].empty()) return false;
+    auto next=*this;const auto end=from<hotbarSize?slotCount:hotbarSize,begin=from<hotbarSize?hotbarSize:0;
+    // Fill existing compatible stacks before empty slots; partial transfers keep
+    // their remainder in the source. Every counted item remains in this object.
+    for(const bool empty:{false,true}) for(auto to=begin;to<end;++to) {
+        if(next.slots_[from].empty()) break;
+        if(next.slots_[to].empty()!=empty) continue;
+        (void)next.transfer(from,to,next.slots_[from].count,registry);
+    }
+    if(next.slots_==slots_) return false;
+    next.revision_=revision_+1;*this=std::move(next);return true;
+}
+CraftResult SurvivalInventory::canCraft(const Recipe& recipe,const ItemRegistry& registry) const {
+    std::map<ItemId,unsigned> needed;
+    for(const auto& ingredient:recipe.ingredients) {
+        if(!ingredient.count) throw std::invalid_argument("Recipe ingredient count must be positive");
+        (void)registry.definition(ingredient.item);needed[ingredient.item]+=ingredient.count;
+    }
+    const auto& output=registry.definition(recipe.output);
+    if(!recipe.count) throw std::invalid_argument("Recipe output count must be positive");
+    for(const auto& [item,amount]:needed) if(count(item)<amount) return CraftResult::MissingIngredients;
+    unsigned capacity=0;auto remaining=needed;
+    for(const auto& slot:slots_) {
+        auto countAfter=static_cast<unsigned>(slot.count);
+        if(!slot.empty()) { auto& amount=remaining[slot.item];const auto taken=std::min(amount,countAfter);amount-=taken;countAfter-=taken; }
+        if(!countAfter) capacity+=output.stackSize;
+        else if(slot.item==recipe.output&&slot.durability==output.durability) capacity+=output.stackSize-countAfter;
+    }
+    return capacity>=recipe.count?CraftResult::Crafted:CraftResult::NoSpace;
+}
 CraftResult SurvivalInventory::craft(const Recipe& recipe,const ItemRegistry& registry) {
     auto next=*this;
     for(const auto& ingredient:recipe.ingredients) {
@@ -165,6 +228,13 @@ void SurvivalInventory::restore(const std::array<SavedItemStack,slotCount>& stac
         auto item=resolved.find(saved.identifier);
         if(!item) item=resolved.add({saved.identifier,{},saved.durability?std::uint16_t{1}:std::uint16_t{64},
             saved.durability?std::numeric_limits<std::uint16_t>::max():std::uint16_t{0},ToolKind::None,0,1,true});
+        // A creative name may have registered a generic missing placeholder
+        // before counted stacks resolve. Refine that same ID using saved tool
+        // data so transfers keep one-item stacks and durability survives reload.
+        auto& missing=resolved.definitions_.at(*item);
+        if(missing.missing&&saved.durability&&!missing.durability) {
+            missing.stackSize=1;missing.durability=std::numeric_limits<std::uint16_t>::max();
+        }
         const auto& definition=resolved.definition(*item);
         if(!saved.count||saved.count>definition.stackSize||saved.durability>definition.durability||(!definition.missing&&definition.durability&&!saved.durability))
             throw std::runtime_error("Invalid saved item quantity/durability");

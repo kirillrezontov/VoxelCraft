@@ -18,6 +18,8 @@ public:
     SDL_WindowID id() const;
     void capture(bool enabled);
     void pointerMode(bool enabled);
+    void textInput(bool enabled);
+    void clipboard(std::string_view text);
     void title(std::string_view text);
     std::pair<int, int> pixelSize() const;
     std::vector<const char*> instanceExtensions() const;

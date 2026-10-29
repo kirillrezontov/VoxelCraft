@@ -171,3 +171,26 @@ controls string-state conversion; player payload versions describe the save
 encoding. None implies binary compatibility for native plugins, which are not
 implemented. Real-world modded playtesting is still needed before a stable API
 release promise.
+
+## v0.8.2 item presentation (mod API 1 extension)
+
+Blocks and ordinary items optionally accept UTF-8 `name` (128 bytes),
+`description` (512 bytes), `category` and `icon` (256 bytes). Categories are
+`building`, `natural`, `tools`, `materials`, `food`, `miscellaneous` (or `all`).
+Omitted names are derived from identifiers; omitted categories/icons use content
+fallbacks. `icon` resolves a declared namespaced atlas texture or builtin tile.
+Missing icon resources emit a bounded diagnostic and use the original fallback
+artwork. Tools/food/materials have their own builtin icons. Custom block icons
+may override the default cube preview. Example:
+
+```json
+{"id":"demo:hammer","name":"Молоток","description":"A sturdy mod tool",
+ "category":"tools","icon":"demo:hammer_icon","stack_size":1,"durability":180}
+```
+
+Creative inventory, search, categories, tooltips, crafting and give/completion read
+live ItemRegistry definitions. No UI source changes are needed for new content.
+Stack limits/durability still use the existing validated transaction API. Metadata
+participates in the protocol-4 content fingerprint, so both peers need matching
+packs. C++ commands accept metadata/callback registration; a Lua command bridge
+is optional future work and is not exposed in this release.

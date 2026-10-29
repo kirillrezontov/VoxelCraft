@@ -1,15 +1,19 @@
-# VoxelCraft — v0.8.1 release candidate
+# VoxelCraft — v0.8.2 release candidate
 
 A C++23, SDL3 and Vulkan 1.3 voxel sandbox foundation. Windows is the primary release
 target; development and hardware rendering verification currently run on Linux.
 
-v0.8.1-rc1 adds private-server profile credentials, durable snapshot publication,
-bounded disconnect handling, asynchronous mesh/save workers, opaque greedy meshing,
-performance diagnostics, sanitizer presets and separate client/server archives.
-World formats and mod API 1 remain compatible. Network protocol 3 requires matching
-client/server versions. Windows and human LAN acceptance remain pending; this is
-not a stable release. See the [stabilization report](docs/v0.8.1-stabilization.md),
-[release notes](docs/v0.8.1-release-notes.md), and [test matrix](docs/release-v0.8.1-test-plan.md).
+v0.8.2-rc1 adds scalable Latin/Cyrillic fonts, a themed UI, searchable all-item
+creative inventory, survival drag/split/quick transfer, readable crafting, UI scale,
+a pause menu and a shared command console. `/help`, `/give`, `/gamemode`, `/tp`,
+`/summon`, `/time` and utility/admin commands execute real game operations locally
+or on the authoritative server. Authenticated operator roles persist separately.
+World/region format 1 and mod API 1 remain compatible; player versions 1..9 migrate
+to version 10. Network protocol 4 requires matching client/server versions.
+Windows execution remains unverified; this is a release candidate, not a stable
+release. See the [implementation/test record](docs/v0.8.2-implementation.md),
+[command reference](docs/v0.8.2-commands.md), [UI guide](docs/v0.8.2-ui-design.md)
+and [release notes](docs/v0.8.2-release-notes.md).
 
 
 Implemented: seeded procedural grass/dirt/stone terrain, compact 32³ chunks,
@@ -62,7 +66,9 @@ not implemented, so distant textures can shimmer.
 
 The [v0.2 selection capture](docs/voxelcraft-v02.png) shows the crosshair and block outline.
 The v0.3 [hotbar](docs/voxelcraft-v03.png), [inventory](docs/voxelcraft-v03-inventory.png)
-and [settings](docs/voxelcraft-v03-settings.png) captures show the current UI.
+and [settings](docs/voxelcraft-v03-settings.png) captures show the historical v0.3 UI.
+The current [creative catalog](docs/voxelcraft-v082-inventory.png) and
+[console](docs/voxelcraft-v082-console.png) use the v0.8.2 font/theme system.
 The [streaming capture](docs/voxelcraft-v03-streaming.png) follows a saved-world revisit.
 Current survival captures show [timed mining](docs/voxelcraft-v04-mining.png),
 [crafting](docs/voxelcraft-v04-crafting.png) and [death](docs/voxelcraft-v04-death.png).
@@ -133,28 +139,30 @@ this Linux development session. Windows compilation and runtime are unverified.
 | Left Shift | Swim down; descend in flight |
 | F | Toggle walking / free flight |
 | F5 | Save the current persistent world |
-| F10 | Open/close settings for field of view, sensitivity and inverted mouse Y |
+| F10 | Settings: field of view, sensitivity, inverted mouse Y and UI scale |
 | Left click | Mine/remove the targeted block, or attack a nearby creature |
 | Right click | Place selected blocks, or eat selected meat when injured |
 | 1–9 / mouse wheel | Select a hotbar slot (initially grass / dirt / stone in 1–3) |
-| E | Open/close creative inventory; click a block to assign the selected slot |
-| E in survival | Backpack; click a stack to swap with the selected hotbar slot |
+| E | Open/close creative inventory; search/category/filter and click any item to assign the selected slot |
+| E in survival | Backpack; drag to move, right click to split, Shift click to quick transfer |
 | C in survival | Open/close crafting; click an available recipe |
 | R after death | Respawn at a clear origin-area surface; keep inventory |
-| Right click a hotbar slot in inventory | Clear that slot |
-| Escape | Close inventory, or release the mouse while playing |
+| Right click a hotbar slot in inventory | Clear creative assignment / transfer survival stack to backpack |
+| Escape | Return from UI; open Pause in gameplay |
 | Left click while released | Capture the mouse without editing terrain |
-| Window close | Exit |
+| /, T, grave | Commands, chat, expanded console; Enter submits, Tab completes |
+| Up/Down in console | Bounded command history; Ctrl A/C/X/V and UTF-8 editing |
+| Window close | Save and exit |
 | Ctrl+Shift+Q | Explicitly exit without saving |
 
 The player spawns on the terrain in walking mode. Jump over one-block steps;
 automatic stepping and crouching are not implemented. The camera starts captured.
-Released capture/focus stops movement commands and edits; gravity continues.
+Released capture/focus stops movement commands and edits; gravity continues except in solo Pause/Settings.
 Flight permits passing through terrain, but switching back to walking is rejected
 while the player overlaps solid blocks or unavailable chunk data. Placement cannot
 overwrite an occupied cell, leave the resident world/height bounds, or overlap the
 player body. Edits are single-click actions; there is no held-button repeat yet.
-The default creative inventory supplies unlimited copies of registered blocks. Empty slots
+The default creative inventory supplies non-consuming assignments for every registered item, including tools. Empty slots
 cannot place blocks. The visible hotbar uses actual per-face atlas materials;
 inventory pages scroll with the wheel. Creative slots do not track quantities;
 survival uses the separate stack inventory described below. Movement commands stop
@@ -299,7 +307,7 @@ work is recorded in [the handoff](docs/development-session-2026-10-29.md).
 The active five-hour window is tracked in [its session log](docs/development-session-five-hour-2026-10-29.md).
 
 
-## v0.8.1 packages and private hosting
+## v0.8.2 packages and private hosting
 
 ```sh
 cmake --preset release
@@ -329,3 +337,6 @@ Ordinary display configuration is available without source edits:
 `--radius 1..6`, `--fov`, and `--sensitivity`. Audio is not implemented.
 The F10 settings menu persists FOV, sensitivity and invert-Y in the user directory;
 display/radius options are startup overrides. `--help` lists launch options.
+
+Fonts are embedded in the client and bundled with redistribution notices; no OS
+font or font development library is required. See [build instructions](docs/building.md).

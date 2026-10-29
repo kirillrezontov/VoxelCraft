@@ -15,6 +15,7 @@ bool BlockRegistry::validIdentifier(std::string_view name) {
         std::all_of(name.begin() + static_cast<std::ptrdiff_t>(colon + 1), name.end(), [&](char c) { return valid(c) || c == '/'; });
 }
 BlockId BlockRegistry::add(BlockDefinition definition) {
+    validatePresentation(definition.presentation);
     if(!std::isfinite(definition.opacity)||definition.opacity<=0||definition.opacity>1||definition.emission>15||
         (definition.opacity<1&&definition.opaque)) throw std::invalid_argument("Invalid block opacity/light definition");
     if (!validIdentifier(definition.identifier)) throw std::invalid_argument("Invalid block identifier: " + definition.identifier);

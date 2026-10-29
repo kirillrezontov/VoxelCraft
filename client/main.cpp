@@ -86,7 +86,7 @@ int run(const vc::client::Options& options) {
     if(!savedPlayer && world.chunks().empty()) world=vc::voxel::World(metadata.bounds);
     if(savedPlayer) mods.restore(savedPlayer->mods);
     const vc::voxel::TerrainGenerator generator(metadata.seed, metadata.bounds, registry,metadata.generatorVersion);
-    const bool survivalMode=options.survival.value_or(savedPlayer&&savedPlayer->survival);
+    bool survivalMode=options.survival.value_or(savedPlayer&&savedPlayer->survival);
     vc::log(std::string("Mode: ")+(survivalMode?"survival":"creative")+"; generator version "+std::to_string(metadata.generatorVersion));
     if(survivalMode&&options.fly) throw std::invalid_argument("Flight is disabled in survival; use --creative to change mode");
     vc::PlayerController player;
@@ -124,10 +124,6 @@ int run(const vc::client::Options& options) {
     if(!options.smoke) {
         streamer=std::make_unique<vc::voxel::ChunkStreamer>(world,generator,options.radius);
         streamer->retain(savedChunks);streamer->tick(cameraBlock());
-    }
-    if(savedPlayer) {
-        for(const auto& name:savedPlayer->hotbar)
-            if(!name.empty()&&!registry.find(name)) registry.add({name,true,{1,0,1},{},true});
     }
     const double meshingStart = vc::Window::seconds();
     vc::voxel::Lighting lighting;const auto initialDirty=world.takeDirtyChunks();
@@ -174,11 +170,15 @@ int run(const vc::client::Options& options) {
         }
     }
     const std::array materials{registry.require("voxelcraft:grass"), registry.require("voxelcraft:dirt"), registry.require("voxelcraft:stone")};
-    vc::CreativeInventory inventory(registry);
-    if(savedPlayer) inventory.restore(savedPlayer->hotbar,savedPlayer->selectedSlot,registry);
     auto items=vc::builtinItems(registry);
     auto recipes=vc::builtinRecipes(items);mods.installItems(items,registry,recipes);
+    if(savedPlayer) vc::retainHotbarItems(items,savedPlayer->hotbar);
+    vc::CreativeInventory inventory(items);
+    if(savedPlayer) inventory.restore(savedPlayer->hotbar,savedPlayer->selectedSlot,registry);
     vc::SurvivalState survival;
+    auto spawnPoint=savedPlayer?savedPlayer->spawnPoint:std::optional<glm::dvec3>{};
+    std::uint64_t poseRevision=0;
+    const auto commandRegistry=vc::commands::builtinCommands();
     vc::LivingWorld living(metadata.seed);
     if(savedPlayer) { survival.inventory.restore(savedPlayer->items,savedPlayer->selectedSlot,items);survival.restoreHealth(savedPlayer->health); }
     if(savedPlayer) living.restore(savedPlayer->actors,items);
@@ -188,12 +188,13 @@ int run(const vc::client::Options& options) {
     vc::DayCycle day(options.timeOfDay?*options.timeOfDay*vc::DayCycle::length:(savedPlayer?savedPlayer->worldTime:300));
     auto material=inventory.selectedBlock().value_or(vc::voxel::air);
     vc::SandboxUiController ui(inventory,settings,survivalMode?&survivalUi:nullptr);
-    const auto notify=[&](std::string message) { ui.status(std::move(message),vc::Window::seconds()); };
+    ui.setCompletionContext({vc::commands::Permission::Administrator,&items,{"Player"}});
+    const auto notify=[&](std::string message,vc::NotificationSeverity severity=vc::NotificationSeverity::Info) { ui.status(std::move(message),vc::Window::seconds(),severity); };
     const auto dispatchMod=[&](const vc::ModEvent& event) {
         for(auto& message:mods.dispatch(event,{world,registry,items,survivalMode?&survival:nullptr,player.bounds()})) {
             vc::log(message);notify(std::move(message));
         }
-        for(const auto& diagnostic:mods.takeDiagnostics()) { vc::log(diagnostic);notify(diagnostic); }
+        for(const auto& diagnostic:mods.takeDiagnostics()) { vc::log(diagnostic);notify(diagnostic,vc::NotificationSeverity::Error); }
     };
     dispatchMod({vc::ModEventKind::Load});
     std::unique_ptr<vc::voxel::SnapshotWriter> snapshotWriter;
@@ -201,7 +202,7 @@ int run(const vc::client::Options& options) {
     const auto finishSnapshot=[&](const vc::voxel::SnapshotResult& result) {
         result.rethrowIfFailed();
         vc::log("Saved world revision "+std::to_string(result.revision)+" in "+std::to_string(result.milliseconds)+" ms to "+vc::pathText(store->directory()));
-        notify("SAVED WORLD "+std::to_string(result.revision));
+        notify("SAVED WORLD "+std::to_string(result.revision),vc::NotificationSeverity::Success);
     };
     const auto awaitSnapshot=[&] {
         while(snapshotWriter->busy()) {
@@ -219,13 +220,27 @@ int run(const vc::client::Options& options) {
         vc::PlayerSaveState state;state.camera=camera;state.flying=player.flying;
         state.hotbar=inventory.names(registry);state.selectedSlot=static_cast<std::uint32_t>(survivalMode?survival.inventory.selectedSlot():inventory.selectedSlot());
         state.survival=survivalMode;state.health=survival.health();state.items=survival.inventory.save(items);
-        state.worldTime=day.seconds();
+        state.worldTime=day.seconds();state.spawnPoint=spawnPoint;
         state.actors=living.save(items);
         state.mods=mods.save();
         if(savedPlayer) state.profiles=savedPlayer->profiles;
         const auto gameData=vc::encodePlayer(state);
         if(!snapshotWriter->request(streamer?streamer->snapshot():world,registry,metadata,gameData)) throw std::logic_error("Snapshot request unexpectedly busy");
         notify("SAVING WORLD");if(waitForCompletion) awaitSnapshot();
+    };
+    const auto commandContext=[&](auto& hotbar,auto& selected) {
+        vc::commands::Context context;context.permission=vc::commands::Permission::Administrator;context.issuer="Player";
+        context.origin=camera.position-glm::dvec3(0,vc::PlayerController::eyeHeight,0);
+        context.world=&world;context.blocks=&registry;context.items=&items;context.living=&living;context.day=&day;context.metadata=metadata;
+        context.players.push_back({"Player",&player,&survival,&survivalMode,&hotbar,&selected,&spawnPoint,&poseRevision,context.permission});
+        context.sample=[&](auto position) { return streamer?streamer->sample(position):world.loaded(position)?world.block(position):generator.sample(position); };
+        context.save=[&] {
+            if(!store) return vc::commands::Result::error(vc::commands::Code::Unavailable,"Saving is disabled in this temporary world");
+            if(snapshotWriter->busy()) return vc::commands::Result::error(vc::commands::Code::Unavailable,"Save already in progress");
+            save();return vc::commands::Result::ok("World save queued");
+        };
+        context.broadcast=[&](std::string_view message) { notify(std::string(message)); };
+        return context;
     };
     bool smokeAimed = false, smokeDestroyed = false, smokePlaced = false, smokeJumped = false;
     std::optional<vc::voxel::Position> smokeEdit;
@@ -244,6 +259,7 @@ int run(const vc::client::Options& options) {
     bool savedOnExit=false,discardExit=false;
     auto screenshot = options.screenshot;
     if (options.smoke && screenshot.empty()) screenshot = window.assetPath().parent_path() / "smoke.ppm";
+    bool consoleCaptureBefore=true;
     while (true) {
         const auto updateStart=vc::Window::seconds();
         auto input = window.poll();
@@ -266,7 +282,9 @@ int run(const vc::client::Options& options) {
         const double now = vc::Window::seconds();
         if(survivalMode&&!survival.alive()&&input.respawn) {
             try {
-                const auto edits=streamer?streamer->snapshot():world;const auto spawn=vc::findSpawn(generator,registry,&edits);
+                const auto edits=streamer?streamer->snapshot():world;auto spawn=vc::findSpawn(generator,registry,&edits);
+                auto names=inventory.names();auto selected=static_cast<std::uint32_t>(inventory.selectedSlot());
+                if(spawnPoint&&vc::commands::safeFeet(commandContext(names,selected),*spawnPoint)) spawn=*spawnPoint+glm::dvec3(0,vc::PlayerController::eyeHeight,0);
                 player=vc::PlayerController{};camera.position=spawn;camera.yaw=0;camera.pitch=-0.55;
                 survival.respawn();ui.closeMenus();window.pointerMode(false);window.capture(true);input.captured=true;
                 input.forward=input.right=input.up=input.mouseX=input.mouseY=0;input.destroy=input.place=input.destroyHeld=input.jump=false;
@@ -274,12 +292,26 @@ int run(const vc::client::Options& options) {
             } catch(const std::exception& error) { vc::log(error.what());notify("NO SAFE SPAWN - USE CREATIVE MODE"); }
         }
         const auto [w,h]=window.pixelSize();
+        const bool closingConsole=ui.screen()==vc::UiScreen::Console&&!input.console;
+        if(input.console) consoleCaptureBefore=input.consoleCapturedBefore;
         if(ui.process({input.inventory,input.closeUi,input.primaryClick,input.secondaryClick,
-                input.material,input.scroll,input.cursorX,input.cursorY,input.settings,input.crafting},w,h)) {
-            window.pointerMode(ui.open());window.capture(!ui.open());
+                input.material,input.scroll,input.cursorX,input.cursorY,input.settings,input.crafting,input.console,input.pause,input.primaryRelease,input.primaryHeld,input.shift,input.text},w,h)) {
+            window.pointerMode(ui.open());window.capture(!ui.open()&&(!closingConsole||consoleCaptureBefore));
             input.forward=input.right=input.up=input.mouseX=input.mouseY=0;
             input.destroy=input.place=input.jump=input.toggleFlight=input.primaryClick=input.secondaryClick=false;
-            input.captured=!ui.open();
+            input.captured=!ui.open()&&(!closingConsole||consoleCaptureBefore);
+        }
+        window.textInput(ui.wantsTextInput());window.pointerMode(ui.open());
+        if(auto clipboard=ui.takeClipboard();!clipboard.empty()) window.clipboard(clipboard);
+        for(const auto& command:ui.takeCommands()) {
+            auto names=inventory.names();auto selected=static_cast<std::uint32_t>(inventory.selectedSlot());
+            auto context=commandContext(names,selected);ui.postCommandResult(commandRegistry.execute(command,context),now);
+            inventory.restore(names,selected);ui.setSurvivalContext(survivalMode?&survivalUi:nullptr);
+        }
+        if(ui.takeSaveRequested()) { try { save(); } catch(const std::exception& error) { ui.status(error.what(),now,vc::NotificationSeverity::Error); } }
+        if(ui.open()) {
+            input.forward=input.right=input.up=input.mouseX=input.mouseY=0;
+            input.destroy=input.place=input.destroyHeld=input.jump=input.toggleFlight=false;input.captured=false;
         }
         for(auto& identifier:ui.takeCraftedItems()) dispatchMod({vc::ModEventKind::Craft,cameraBlock(),std::move(identifier)});
         camera.fieldOfView=static_cast<float>(ui.settings().fieldOfView);
@@ -316,22 +348,22 @@ int run(const vc::client::Options& options) {
             if (frames >= 65 && !smokeDestroyed) input.destroy = true;
             if (frames >= 75 && smokeDestroyed && !smokePlaced) input.place = true;
         }
-        const double delta=options.smoke?1.0/60:now-last;
+        const double delta=ui.paused()?0:options.smoke?1.0/60:now-last;
         if(!options.freezeTime) day.advance(std::clamp(delta,0.0,0.1));
-        if(!survivalMode||survival.alive()) player.update(playerInput,delta,world,registry);
+        if(!ui.paused()&&(!survivalMode||survival.alive())) player.update(playerInput,delta,world,registry);
         if(survivalMode&&survival.alive()&&survival.land(player.landingSpeed)) {
             if(!survival.alive()) { ui.closeMenus();window.pointerMode(true);window.capture(false);notify("YOU DIED - R TO RESPAWN"); }
             else notify("FALL DAMAGE");
         }
         last=now;
-        dispatchMod({vc::ModEventKind::Tick,{}, {},std::clamp(delta,0.0,0.1)});
+        if(!ui.paused()) dispatchMod({vc::ModEventKind::Tick,{}, {},std::clamp(delta,0.0,0.1)});
         if (options.smoke && frames < 60) highestFootY = std::max(highestFootY, player.bounds().min.y);
         material=inventory.selectedBlock().value_or(vc::voxel::air);
         if(survivalMode) {
             const auto& stack=survival.inventory.selected();material=stack.empty()?vc::voxel::air:items.definition(stack.item).block.value_or(vc::voxel::air);
         }
         auto hit = vc::voxel::raycast(world,camera.position,camera.forward(),6,survivalMode?&registry:nullptr);
-        const auto events=living.update(delta,world,registry,camera.position,survivalMode?&survival:nullptr,items,day.daylight().sunlight<0.12f,!options.smoke);
+        const auto events=living.update(delta,world,registry,camera.position,survivalMode?&survival:nullptr,items,day.daylight().sunlight<0.12f,!options.smoke&&!ui.paused());
         if(events.collected) notify("COLLECTED LOOT");
         if(events.damage) {
             if(!survival.alive()) { ui.closeMenus();window.pointerMode(true);window.capture(false);notify("YOU DIED - R TO RESPAWN"); }
@@ -348,9 +380,9 @@ int run(const vc::client::Options& options) {
         if(survivalMode) {
             const auto mined=survival.mine(input.destroyHeld&&input.captured&&!ui.open()&&!actor,hit,delta,world,items,miningRules);
             changed=mined.changed;
-            if(mined.inventoryFull) notify("INVENTORY FULL - MINING STOPPED");
-            if(mined.toolBroke) notify("TOOL BROKE");
-        } else if (hit && input.destroy&&!actor) {
+            if(mined.inventoryFull) notify("INVENTORY FULL - MINING STOPPED",vc::NotificationSeverity::Warning);
+            if(mined.toolBroke) notify("TOOL BROKE",vc::NotificationSeverity::Warning);
+        } else if (hit && input.destroy&&!ui.open()&&!actor) {
             if (options.smoke && !smokeDestroyed) { smokeEdit = hit->block; smokeOriginal = world.block(hit->block); }
             changed = vc::destroyBlock(world, *hit);
             if (options.smoke && changed) { smokeDestroyed = true; material = smokeOriginal; }
@@ -441,7 +473,7 @@ int run(const vc::client::Options& options) {
         if (options.frameLimit && frames >= options.frameLimit) break;
         if(input.save||(store&&now-lastSave>=60)) {
             try { save(); }
-            catch(const std::exception& error) { vc::log(std::string("Save failed; world remains in memory: ")+error.what());notify("SAVE FAILED - SEE LOG"); }
+            catch(const std::exception& error) { vc::log(std::string("Save failed; world remains in memory: ")+error.what());notify("SAVE FAILED - SEE LOG",vc::NotificationSeverity::Error); }
             lastSave=vc::Window::seconds();last=lastSave;
         }
     }
