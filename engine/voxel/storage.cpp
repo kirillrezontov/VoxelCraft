@@ -143,7 +143,7 @@ std::optional<WorldArchive> WorldStore::load(BlockRegistry& registry) const {
     for(std::uint32_t i=0;i<regionCount;++i)
         if(!regions.insert(position(in)).second) throw std::runtime_error("Duplicate save region");
     const auto gameSize=in.u32();
-    if(gameSize>65536) throw std::runtime_error("Saved game data exceeds 64 KiB");
+    if(gameSize>maxGameDataBytes) throw std::runtime_error("Saved game data exceeds 256 KiB");
     auto gameData=in.raw(gameSize);in.finish();
     World world(metadata.bounds);
     auto resolved=registry;
@@ -160,7 +160,7 @@ std::uint64_t WorldStore::save(const World& world,const BlockRegistry& registry,
     validate(metadata);
     if(metadata.bounds.minY!=world.bounds().minY||metadata.bounds.maxY!=world.bounds().maxY)
         throw std::invalid_argument("Save metadata height bounds do not match world");
-    if(world.chunks().size()>maxChunks||gameData.size()>65536) throw std::runtime_error("World exceeds snapshot format limits");
+    if(world.chunks().size()>maxChunks||gameData.size()>maxGameDataBytes) throw std::runtime_error("World exceeds snapshot format limits");
     const auto root=directory_/"snapshots";std::filesystem::create_directories(root);
     auto available=revisions(root);
     if(!available.empty()&&available.back()==std::numeric_limits<std::uint64_t>::max()) throw std::overflow_error("World save revision exhausted");

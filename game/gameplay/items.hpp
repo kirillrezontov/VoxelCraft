@@ -36,6 +36,7 @@ struct ItemStack {
     bool operator==(const ItemStack&) const=default;
 };
 struct SavedItemStack { std::string identifier;std::uint16_t count{},durability{};bool operator==(const SavedItemStack&) const=default; };
+void validateSavedItem(const SavedItemStack& item);
 struct Ingredient { ItemId item;std::uint16_t count; };
 struct Recipe { std::string name;std::vector<Ingredient> ingredients;ItemId output;std::uint16_t count; };
 std::vector<Recipe> builtinRecipes(const ItemRegistry& items);
@@ -66,4 +67,13 @@ private:
     std::size_t selected_{};
     std::uint64_t revision_{};
 };
+enum class InventoryActionKind : std::uint32_t { Swap,TransferOne,MoveToBackpack,Craft };
+struct InventoryAction {
+    InventoryActionKind kind{};
+    std::uint32_t from{},to{},recipe{};
+};
+enum class InventoryActionResult { Changed,NoChange,MissingIngredients,NoSpace };
+// Shared local/server transaction; callers emit craft hooks only on Changed.
+InventoryActionResult applyInventoryAction(SurvivalInventory& inventory,const InventoryAction& action,
+    const ItemRegistry& items,const std::vector<Recipe>& recipes);
 }

@@ -23,6 +23,15 @@ MiningRules::MiningRules(const voxel::BlockRegistry& blocks,const ItemRegistry& 
     set("voxelcraft:snow",{0.5,ToolKind::None,0,items.require("voxelcraft:snow")});
     set("voxelcraft:sandstone",{1.8,ToolKind::Pickaxe,1,items.require("voxelcraft:sandstone")});
 }
+void MiningRules::set(voxel::BlockId block,MiningRule rule,const ItemRegistry& items) {
+    if(block==voxel::air||block>=rules_.size()) throw std::invalid_argument("Invalid block for mining rule");
+    if(!std::isfinite(rule.seconds)||rule.seconds<0.05||rule.seconds>3600||rule.requiredTier>16||
+        (rule.tool!=ToolKind::None&&rule.tool!=ToolKind::Pickaxe)||
+        (rule.tool==ToolKind::None&&rule.requiredTier)||!rule.dropCount||rule.dropCount>64)
+        throw std::invalid_argument("Invalid mining time, tool tier or drop count");
+    if(rule.drop) (void)items.definition(*rule.drop);
+    rules_[block]=rule;
+}
 void SurvivalState::cancelMining() { target_.reset();progress_=0;tool_.reset();fullReported_=false; }
 MiningResult SurvivalState::mine(bool held,const std::optional<voxel::RayHit>& hit,double seconds,
         voxel::World& world,const ItemRegistry& items,const MiningRules& rules) {
@@ -41,7 +50,7 @@ MiningResult SurvivalState::mine(bool held,const std::optional<voxel::RayHit>& h
     progress_=std::min(1.0,progress_+std::min(seconds,0.1)/duration);
     if(progress_+1e-10<1) return {};
     auto next=inventory;
-    if(harvest&&rule.drop&&!next.add(*rule.drop,1,items)) {
+    if(harvest&&rule.drop&&!next.add(*rule.drop,rule.dropCount,items)) {
         const bool report=!fullReported_;fullReported_=true;return {false,report,false};
     }
     if(!destroyBlock(world,*hit)) { cancelMining();return {}; }

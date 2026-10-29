@@ -1,0 +1,112 @@
+# Multiplayer development foundation
+
+The same CPU world, player collision, day cycle, creatures, survival and Lua
+services run in a headless server. The Vulkan client sends input intent and
+inventory requests; the server owns positions, mining time, damage, recipes,
+item quantities and terrain edits. Local single-player remains available.
+
+## Start a server and join
+
+From the repository root after building the default targets:
+
+```sh
+./build/debug/bin/voxelcraft-server --world-dir worlds/friends --bind 0.0.0.0
+./build/debug/bin/voxelcraft --connect 127.0.0.1 --name Alice
+```
+
+Use the server's LAN address on another computer, for example
+`--connect 192.168.1.10:25565 --name Bob`. Both computers need identical game and
+mod content. Names contain 1..24 ASCII letters, digits, underscores or hyphens.
+Case-insensitive names select saved profiles; simultaneous duplicate names are
+rejected. IPv6 endpoints with a port use brackets: `--connect '[::1]:25565'`.
+
+The default bind address is `127.0.0.1`, port 25565. `--bind 0.0.0.0` enables IPv4
+LAN connections. Configure the host's firewall as needed. The server supports
+eight connected players and 32 saved profiles. Names identify local/LAN profiles;
+there is no account authentication, encryption, permissions system or internet
+hosting service. Anyone who can connect can select a disconnected saved name.
+
+Create a survival world with:
+
+```sh
+./build/debug/bin/voxelcraft-server --world-dir worlds/survival --survival
+./build/debug/bin/voxelcraft --connect 127.0.0.1 --name Alice
+```
+
+The saved world mode resumes automatically. Explicit server `--creative` or
+`--survival` changes it while retaining inventories. Creative flight is disabled
+in survival. Mining, crafting, tool durability, backpack transfers, food, creature
+combat/loot, fall damage, death and R respawn use server authority. Each player
+has separate health and inventory; death keeps items. Inventories are sent only
+to their owner. Connected clients use the server's mode, seed, bounds, time,
+generator and streaming radius; local flags that conflict with those are rejected.
+
+## Content and scripts
+
+Pass the same pack directory to both processes:
+
+```sh
+./build/debug/bin/voxelcraft-server --world-dir worlds/modded --mods-dir examples/mods
+./build/debug/bin/voxelcraft --connect 127.0.0.1 --name Alice --mods-dir examples/mods
+```
+
+A handshake checks protocol and a deterministic content fingerprint including
+block/item/recipe/harvest definitions, pack versions/schemas and atlas pixels.
+Files are not downloaded automatically. Saved missing content retains its names
+and magenta fallback rendering. Scripts execute on the server; connected clients
+only register matching content and render the resulting state.
+
+Load/tick hooks run once per server world/tick. Tick hooks use the first connected
+player as their inventory/player context, or the server anchor when empty. Action
+hooks use the acting player's context. All connected player bodies protect solid
+script/block placement. Actor simulation uses nearby living survival players for
+chasing/damage/loot and keeps independent attacker cooldowns.
+
+## Saving and shutdown
+
+The server defaults to `worlds/server` relative to its working directory.
+`--world-dir` selects another directory, `--no-save` keeps a temporary world.
+F5 requests a server snapshot, throttled to one request per five seconds.
+Autosave runs every 60 simulation seconds. A snapshot atomically contains edits,
+all saved profiles, actors, world time and mod state. Ctrl-C/SIGTERM saves and
+stops; an unbounded server remains running if that save fails so it can retry.
+The OS session lock prevents the offline client and server opening one world
+for writing simultaneously.
+
+An offline player's pose/items seed the first named profile. Later names start
+with a clear spawn and empty survival inventory. Named profiles remain retained
+when opening that world offline; offline play uses its independent base player.
+
+`--ticks N` performs a bounded 60 Hz run, temporary unless `--world-dir` is
+explicit. `--port 0` asks the OS for an available port, printed in the log.
+`--no-creatures`, `--radius 1..6`, `--seed`, `--min-y`, `--max-y`, and
+`--generator-version 1..3` support reproducible worlds. Run `--help` for options.
+On Windows use `voxelcraft-server.exe` and `voxelcraft.exe` in the configuration's
+binary directory. Windows compilation/runtime are not verified in this session.
+
+## Synchronization and current limits
+
+The host ticks at 60 Hz and sends player/actor snapshots at 20 Hz. Each client
+receives near-first palette/RLE chunks with data revisions and explicit unloads;
+the server streams the union of player regions. The connected camera smooths
+authoritative motion, while look input responds locally. There is no local
+movement prediction yet, so latency is perceptible on slower connections.
+
+Portable TCP is nonblocking after connection, with a bounded connect timeout
+(OS hostname resolution is synchronous). Frames are limited to 4 MiB, per-peer
+buffering to 8 MiB, queued frames to 256, and command rate to 120/s with a 240
+burst. Malformed or slow peers disconnect without stopping the host. The network
+block palette is limited to 8,192 names. The limits bound transport memory but
+do not provide an internet-facing security guarantee.
+
+Terrain generation is asynchronous; lighting, meshing and snapshot I/O can still
+hitch. Player bodies do not physically collide and player-versus-player damage
+is not implemented. Save/profile administration, chat, prediction, interpolation
+of creature animation between snapshots, bandwidth tuning, long-duration network
+soaks and human LAN playtesting remain follow-up work.
+
+CPU tests run two real loopback sessions for shared edits, persistence, invalid
+peers and survival transactions. Strict SDL/Vulkan tests cover visible avatars,
+custom textures, input intent and gameplay. See the
+[timed session record](development-session-five-hour-2026-10-29.md) for the latest
+executed build/test counts and limits.

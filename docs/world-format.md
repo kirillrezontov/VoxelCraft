@@ -54,12 +54,12 @@ trailing data, unsupported versions and invalid structure even with a valid chec
 | --- | --- |
 | Magic | 8 bytes, `VCWORLD1` |
 | Format version | u32, currently 1 |
-| Terrain generation version | u32, currently 1 or 2 |
+| Terrain generation version | u32, currently 1..3 |
 | Seed | u64 |
 | Minimum/maximum inclusive Y | two i64 |
 | Total chunks / region files | two u32 |
 | Region coordinates | X/Y/Z i64 for each region |
-| Game payload length / payload | u32 length, then bytes, maximum 65,536 |
+| Game payload length / payload | u32 length, then bytes, maximum 524,288 |
 | Checksum | u64 |
 
 Regions contain 4×4×4 chunks. Region coordinates use floor division by four on
@@ -87,10 +87,10 @@ to the restored definition on a subsequent load. Block states beyond a type ID
 are not supported by version 1.
 
 Current implementation limits: 8,192 chunks per snapshot, 32 MiB per region file,
-1 MiB manifest, and 64 KiB game payload. These are validated before large reads;
+1 MiB manifest, and 512 KiB game payload. These are validated before large reads;
 world memory still scales with resident chunks. Empty worlds are valid.
 
-The game-owned payload starts with `VCPLAYER`, then u32 version 5, five IEEE-754
+The game-owned payload starts with `VCPLAYER`, then u32 version 9, five IEEE-754
 binary64 values (camera XYZ, yaw, pitch), u32 flight flag (0/1), a u32 selected slot
 (0..8), and nine length-prefixed hotbar identifiers (empty string means empty slot).
 Version 3 then stores u32 survival-mode flag, u32 health (0..20), and 36 item stacks.
@@ -107,10 +107,32 @@ u16 count/durability for dropped items. Creatures require empty item fields.
 Current caps are 32 creatures and 32 drops. IDs must be nonzero and unique;
 invalid motion/health/types/counts fail explicitly. Unknown item keys are retained,
 while unknown actor kinds fail. Older payloads start with no actors. AI cooldowns,
-random state and spawn timers are not serialized. WorldStore's 64 KiB game-data
-limit remains enforced. See [ADR0009](decisions/0009-living-world.md).
-Version 1/2/3/4 player payloads remain readable: v1 migrates its selected material into
-slot zero, and both migrate to creative mode with full health and empty survival
+random state and spawn timers are not serialized. See
+[ADR0009](decisions/0009-living-world.md).
+Version 6 appends a u32 mod count (maximum 32), then for each mod two strings
+(ID and version), a u32 state-entry count (maximum 64), and string key/value pairs.
+Duplicate IDs/keys, invalid versions, oversized keys/values and aggregate state
+over 8 KiB fail explicitly. Missing mods retain these records on resave; version
+changes are diagnosed. Older payloads have no mod records. See
+[modding](modding-design.md) and [ADR0010](decisions/0010-modding-foundation.md).
+Version 7 adds a u32 state-schema version (1..65535) after each mod's ID/version
+and before its state-entry count. V6 records use schema 1. Schema upgrades run
+transactional state-only Lua migrations; downgrades fail explicitly. See
+[ADR0011](decisions/0011-mod-state-migrations.md).
+Version 8 appends a u32 named-profile count (maximum 32). Each profile contains
+a name string, five binary64 pose values, u32 flight flag, u32 selected hotbar
+slot and nine identifier strings. Names use 1..24 ASCII letters/digits/underscore/
+hyphen and are case-insensitively unique. V8 profiles start with full health and
+empty survival inventories.
+Version 9 appends to each profile u32 health (0..20), followed by 36 saved item
+stacks using the same string/u16/u16 layout as the base player. World mode remains
+the base player's survival flag. Offline saves retain named profiles and server
+saves retain the offline base player. Profile velocity and transient mining/AI
+state are not persisted. The game-data bound is now 512 KiB to fit all profiles;
+metadata/region format stays version 1 and previous snapshots remain readable.
+See [ADR0013](decisions/0013-authoritative-multiplayer.md).
+Version 1..8 player payloads remain readable: v1 migrates its selected material into
+slot zero, and v1/v2 migrate to creative mode with full health and empty survival
 stacks. Camera inputs are validated for finiteness and the
 supported ±1e15 physics range. Velocity is not persisted; walking resumes under
 gravity. An obstructed/unavailable walking position resumes in flight for recovery.
@@ -143,8 +165,8 @@ Snapshot writes run synchronously. Incremental/region journaling, lazy on-disk
 paging and background saving remain planned. The compact in-memory edit cache
 grows with edited chunks; the 8,192-chunk snapshot cap applies to retained edits.
 Palette compression may later replace runtime chunk arrays behind Chunk::get/set.
-Future format versions must explicitly describe block states, composite cells,
-composite cells and multiblocks; they are not implicitly serialized today.
+Future format versions must explicitly describe block states, composite cells
+and multiblocks; they are not implicitly serialized today.
 
 Composite cells remain planned as sparse component data with conceptual 16³
 occupancy units per standard cell. Multiblocks will need stable instance IDs,

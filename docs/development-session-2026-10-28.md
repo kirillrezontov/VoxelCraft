@@ -331,11 +331,13 @@ is retained locally at `build/session-20261028/baseline.tar.gz`.
 - Pathfinding, dynamic body collisions, ecosystems, hunger and smelting remain
   unimplemented; automatic AI random/cooldown state is not persisted.
 
-## Current stopping point
+## Historical stopping point
 
-Work is ongoing. Next: complete the v0.6 cross-compiler/sanitizer/full graphics
-checkpoint, then continue a meaningful modding foundation. Feature development
-stops at 18:07:19 UTC, leaving 30 minutes for verification and the full handoff.
+This record stopped after the v0.6 checkpoint above. The transferred source also
+contained an unfinished v0.7 mod runtime without client/persistence/test wiring.
+Work resumed on the other machine on 2026-10-29; see the
+[continuation and current handoff](development-session-2026-10-29.md).
+The original timed development window is no longer active.
 
 Known limits: synchronous saves/remeshing, no mipmaps, fluid flow/drowning,
 full sky diffusion/sun shadows, hunger/smelting, mod runtime or networking.

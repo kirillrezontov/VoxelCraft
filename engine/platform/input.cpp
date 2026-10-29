@@ -61,13 +61,13 @@ void InputState::process(const SDL_Event& event) {
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         if(std::isfinite(event.button.x)&&std::isfinite(event.button.y)) { cursorX_=event.button.x;cursorY_=event.button.y; }
         if (event.button.button == SDL_BUTTON_LEFT && !leftHeld_) {
-            if(pointerMode_) pending_.primaryClick=true;
+            if(pointerMode_) { pending_.primaryClick=true;pending_.cursorX=cursorX_;pending_.cursorY=cursorY_; }
             else if (!captured_) setCaptured(true);
             else { pending_.destroy = true;leftEditArmed_=true; }
             leftHeld_ = true;
         }
         if (event.button.button == SDL_BUTTON_RIGHT && !rightHeld_) {
-            if(pointerMode_) pending_.secondaryClick=true;
+            if(pointerMode_) { pending_.secondaryClick=true;pending_.cursorX=cursorX_;pending_.cursorY=cursorY_; }
             else if (captured_) pending_.place = true;
             rightHeld_ = true;
         }
@@ -94,7 +94,8 @@ Input InputState::consume() {
     Input result = pending_; pending_ = {};
     result.captured = captured_;
     result.destroyHeld=captured_&&leftHeld_&&leftEditArmed_;
-    result.cursorX=cursorX_;result.cursorY=cursorY_;
+    // Hit-test at the button event, even if motion follows in the same poll.
+    if(!result.primaryClick&&!result.secondaryClick) { result.cursorX=cursorX_;result.cursorY=cursorY_; }
     if (captured_) {
         result.forward = static_cast<float>(keys_[SDL_SCANCODE_W]) - static_cast<float>(keys_[SDL_SCANCODE_S]);
         result.right = static_cast<float>(keys_[SDL_SCANCODE_D]) - static_cast<float>(keys_[SDL_SCANCODE_A]);

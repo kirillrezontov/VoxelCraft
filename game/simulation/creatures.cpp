@@ -1,8 +1,10 @@
 #include "game/simulation/creatures.hpp"
 #include <entt/entity/registry.hpp>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <set>
 #include <stdexcept>
 
@@ -17,6 +19,15 @@ voxel::Aabb bounds(const Motion& motion,bool drop=false) {
     return {motion.position+glm::dvec3(-half,0,-half),motion.position+glm::dvec3(half,height,half)};
 }
 bool finite(glm::dvec3 v) { return std::isfinite(v.x)&&std::isfinite(v.y)&&std::isfinite(v.z); }
+const LivingPlayer* closest(std::span<const LivingPlayer> players,glm::dvec3 position,bool survivalOnly=false) {
+    const LivingPlayer* result=nullptr;double best=std::numeric_limits<double>::infinity();
+    for(const auto& player:players) {
+        if(survivalOnly&&(!player.survival||!player.survival->alive())) continue;
+        const auto delta=glm::dvec2(player.position.x-position.x,player.position.z-position.z);const auto distance=glm::dot(delta,delta);
+        if(distance<best) { best=distance;result=&player; }
+    }
+    return result;
+}
 std::optional<double> rayBox(glm::dvec3 origin,glm::dvec3 direction,const voxel::Aabb& box,double reach) {
     double near=0,far=reach;
     for(int axis=0;axis<3;++axis) {
@@ -33,7 +44,9 @@ std::optional<double> rayBox(glm::dvec3 origin,glm::dvec3 direction,const voxel:
 struct LivingWorld::Impl {
     entt::registry entities;
     std::uint64_t nextId{1},random;
-    double accumulated{},spawnDelay{1},attackDelay{};
+    double accumulated{},spawnDelay{1};
+    std::size_t spawnCenter{};
+    std::map<std::uint64_t,double> attacks;
     explicit Impl(std::uint64_t seed):random(seed?seed:1) {}
     double rand() { random^=random<<13;random^=random>>7;random^=random<<17;return static_cast<double>(random>>11)*(1.0/9007199254740992.0); }
     entt::entity entity(std::uint64_t id) const {
@@ -64,13 +77,22 @@ bool LivingWorld::drop(glm::dvec3 feet,ItemStack stack,const ItemRegistry& items
 }
 CreatureEvents LivingWorld::update(double seconds,const voxel::World& world,const voxel::BlockRegistry& blocks,
         glm::dvec3 player,SurvivalState* survival,const ItemRegistry& items,bool night,bool populate) {
-    if(!std::isfinite(seconds)||seconds<0||!finite(player)) throw std::invalid_argument("Invalid creature update");
+    const std::array players{LivingPlayer{player,survival}};return update(seconds,world,blocks,players,items,night,populate);
+}
+CreatureEvents LivingWorld::update(double seconds,const voxel::World& world,const voxel::BlockRegistry& blocks,
+        std::span<const LivingPlayer> players,const ItemRegistry& items,bool night,bool populate) {
+    if(!std::isfinite(seconds)||seconds<0||players.size()>8) throw std::invalid_argument("Invalid creature update");
+    for(const auto& player:players) if(!finite(player.position)||glm::any(glm::greaterThan(glm::abs(player.position),glm::dvec3(1e15))))
+        throw std::invalid_argument("Invalid creature player position");
     impl_->accumulated+=std::min(seconds,0.1);CreatureEvents events;
     constexpr double dt=1.0/60;
     while(impl_->accumulated+1e-12>=dt) {
-        impl_->accumulated-=dt;impl_->attackDelay=std::max(0.0,impl_->attackDelay-dt);impl_->spawnDelay-=dt;
-        if(populate&&impl_->spawnDelay<=0) {
+        impl_->accumulated-=dt;impl_->spawnDelay-=dt;
+        for(auto& [id,delay]:impl_->attacks) { (void)id;delay-=dt; }
+        std::erase_if(impl_->attacks,[](const auto& entry){return entry.second<=0;});
+        if(populate&&!players.empty()&&impl_->spawnDelay<=0) {
             impl_->spawnDelay=3;
+            const auto player=players[impl_->spawnCenter++%players.size()].position;
             if(creatureCount()<16) {
                 for(int attempt=0;attempt<16;++attempt) {
                     const double angle=impl_->rand()*6.28318530718,distance=10+impl_->rand()*22;
@@ -93,8 +115,15 @@ CreatureEvents LivingWorld::update(double seconds,const voxel::World& world,cons
         std::vector<entt::entity> remove;
         for(const auto e:impl_->entities.view<Motion,Creature>()) {
             auto& motion=impl_->entities.get<Motion>(e);auto& creature=impl_->entities.get<Creature>(e);
+            const auto* nearest=closest(players,motion.position);if(!nearest) continue;
+            if(glm::length(glm::dvec2(nearest->position.x-motion.position.x,nearest->position.z-motion.position.z))>128) { remove.push_back(e);continue; }
+            const auto* target=nearest;
+            if(creature.kind==CreatureKind::Stalker&&night&&creature.flee<=0) {
+                if(const auto* candidate=closest(players,motion.position,true))
+                    if(glm::length(glm::dvec2(candidate->position.x-motion.position.x,candidate->position.z-motion.position.z))<24) target=candidate;
+            }
+            const auto player=target->position;auto* survival=target->survival;
             const glm::dvec3 toward=player-motion.position;const double distance=glm::length(glm::dvec2(toward.x,toward.z));
-            if(distance>128) { remove.push_back(e);continue; }
             const voxel::Position cell{static_cast<std::int64_t>(std::floor(motion.position.x)),static_cast<std::int64_t>(std::floor(motion.position.y)),static_cast<std::int64_t>(std::floor(motion.position.z))};
             if(!world.loaded(cell)) continue;
             motion.age+=dt;creature.rethink-=dt;creature.contact=std::max(0.0,creature.contact-dt);creature.flee=std::max(0.0,creature.flee-dt);
@@ -136,9 +165,12 @@ CreatureEvents LivingWorld::update(double seconds,const voxel::World& world,cons
             motion.velocity.y=std::max(-40.0,motion.velocity.y-24*dt);
             const auto moved=voxel::moveAndCollide(world,blocks,bounds(motion,true),motion.velocity*dt);motion.position+=moved.applied;
             if(moved.blocked.y) motion.velocity.y=0;
-            const auto d=player-(motion.position+glm::dvec3(0,1,0));
-            if(survival&&survival->alive()&&glm::dot(d,d)<2.25&&survival->inventory.add(dropped.stack.item,dropped.stack.count,items,dropped.stack.durability)) {
-                ++events.collected;remove.push_back(e);
+            const auto distance=[&](const LivingPlayer& player) { const auto d=player.position-(motion.position+glm::dvec3(0,1,0));return glm::dot(d,d); };
+            std::array<const LivingPlayer*,8> candidates{};std::size_t count=0;
+            for(const auto& player:players) if(player.survival&&player.survival->alive()&&distance(player)<2.25) candidates[count++]=&player;
+            std::sort(candidates.begin(),candidates.begin()+static_cast<std::ptrdiff_t>(count),[&](const auto* a,const auto* b){return distance(*a)<distance(*b);});
+            for(std::size_t i=0;i<count;++i) if(candidates[i]->survival->inventory.add(dropped.stack.item,dropped.stack.count,items,dropped.stack.durability)) {
+                ++events.collected;remove.push_back(e);break;
             }
         }
         for(const auto e:remove) impl_->entities.destroy(e);
@@ -160,17 +192,17 @@ std::optional<std::uint64_t> LivingWorld::target(const voxel::World& world,const
     }
     return result;
 }
-AttackResult LivingWorld::attack(std::uint64_t id,glm::dvec3 from,SurvivalState* survival,const ItemRegistry& items) {
+AttackResult LivingWorld::attack(std::uint64_t id,glm::dvec3 from,SurvivalState* survival,const ItemRegistry& items,std::uint64_t attacker) {
     if(!finite(from)) throw std::invalid_argument("Invalid attack origin");
     const auto e=impl_->entity(id);
-    if(e==entt::null||!impl_->entities.all_of<Creature>(e)||impl_->attackDelay>0||(survival&&!survival->alive())) return {};
+    if(e==entt::null||!impl_->entities.all_of<Creature>(e)||impl_->attacks.contains(attacker)||(survival&&!survival->alive())) return {};
     auto& creature=impl_->entities.get<Creature>(e);auto& motion=impl_->entities.get<Motion>(e);
     if(glm::length(from-(motion.position+glm::dvec3(0,0.75,0)))>4) return {};
     const auto& stack=survival?survival->inventory.selected():ItemStack{};
     const auto* tool=!stack.empty()?&items.definition(stack.item):nullptr;
     const unsigned damage=tool&&tool->tool==ToolKind::Pickaxe?(tool->tier>=2?5u:3u):2u;
     if(creature.health<=damage&&dropCount()>=32) return {false,false,true};
-    impl_->attackDelay=0.45;creature.flee=3;creature.health-=std::min(damage,creature.health);
+    impl_->attacks[attacker]=0.45;creature.flee=3;creature.health-=std::min(damage,creature.health);
     if(survival&&tool&&tool->durability) survival->inventory.damageTool();
     if(!creature.health) {
         const auto loot=items.require(creature.kind==CreatureKind::Grazer?"voxelcraft:raw_meat":"voxelcraft:coal");

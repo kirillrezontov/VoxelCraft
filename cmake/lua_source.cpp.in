@@ -1,4 +1,7 @@
 // Compile Lua as C++ so protected errors unwind C++ API callback objects.
 // Public declarations retain C linkage through the upstream C++ header.
+// Enable internal configuration before lua.hpp's include guards take effect.
+#define LUA_LIB
+#include "lprefix.h"
 #include "lua.hpp"
 #include "@VC_LUA_SOURCE@"

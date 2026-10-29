@@ -39,4 +39,17 @@ std::array<Mesh,3> builtinCreatureModels() {
     box(drop,{-0.17f,0.12f,-0.17f},{0.17f,0.2f,0.17f},{0.5f,0.24f,0.05f},{0,0.035f,0});
     return models;
 }
+Mesh playerAvatarModel() {
+    Mesh model;const glm::vec3 skin{0.73f,0.54f,0.39f},shirt{0.13f,0.43f,0.8f},pants{0.12f,0.17f,0.27f};
+    box(model,{-0.24f,0.6f,-0.15f},{0.24f,1.35f,0.15f},shirt);
+    box(model,{-0.22f,1.35f,-0.22f},{0.22f,1.8f,0.22f},skin);
+    box(model,{-0.23f,1.67f,-0.23f},{0.23f,1.82f,0.23f},{0.14f,0.09f,0.06f});
+    for(const float side:{-1.0f,1.0f}) {
+        box(model,{side*0.13f-0.1f,0,-0.13f},{side*0.13f+0.1f,0.62f,0.13f},pants,{0,0,side*0.14f});
+        box(model,{side*0.33f-0.08f,0.7f,-0.12f},{side*0.33f+0.08f,1.35f,0.12f},shirt,{0,0,-side*0.13f});
+        box(model,{side*0.33f-0.08f,0.62f,-0.12f},{side*0.33f+0.08f,0.8f,0.12f},skin,{0,0,-side*0.13f});
+        box(model,{side*0.095f-0.04f,1.56f,-0.232f},{side*0.095f+0.04f,1.63f,-0.22f},{0.025f,0.035f,0.05f});
+    }
+    return model;
+}
 }

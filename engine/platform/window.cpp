@@ -69,7 +69,12 @@ std::filesystem::path Window::userDataPath() {
 }
 void Window::resize(int w, int h) { check(SDL_SetWindowSize(window_, w, h)); }
 void Window::minimize() { check(SDL_MinimizeWindow(window_)); }
-void Window::restore() { check(SDL_RestoreWindow(window_)); }
+void Window::restore() {
+    check(SDL_RestoreWindow(window_));
+    // Wayland restore only unmaximizes; activation also requests unminimization.
+    // The compositor retains final control of focus and window visibility.
+    check(SDL_RaiseWindow(window_));
+}
 double Window::seconds() { return static_cast<double>(SDL_GetTicksNS()) / 1.0e9; }
 void Window::idle() { SDL_Delay(16); }
 }

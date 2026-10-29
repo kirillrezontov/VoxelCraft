@@ -25,11 +25,14 @@ TEST(PackedChunk, UniformAndWorstCaseDataRoundTripWithinRawSize) {
     using namespace vc::voxel;
     Chunk uniform({-1,0,1},65535);PackedChunk packed(uniform);EXPECT_EQ(packed.bytes(),4u);
     EXPECT_EQ(packed.unpack().get({31,31,31}),65535);
+    EXPECT_EQ(packed.get({31,31,31}),65535);
     Chunk checkerboard({-1,0,-1});
     for(int y=0;y<32;++y) for(int z=0;z<32;++z) for(int x=0;x<32;++x) checkerboard.set({x,y,z},static_cast<BlockId>((x+y+z)%2+1));
     const PackedChunk worst(checkerboard);EXPECT_LE(worst.bytes(),chunkVolume*sizeof(BlockId));
     const auto unpacked=worst.unpack();EXPECT_EQ(unpacked.position(),checkerboard.position());
-    for(int y=0;y<32;++y) for(int z=0;z<32;++z) for(int x=0;x<32;++x) ASSERT_EQ(unpacked.get({x,y,z}),checkerboard.get({x,y,z}));
+    for(int y=0;y<32;++y) for(int z=0;z<32;++z) for(int x=0;x<32;++x) {
+        ASSERT_EQ(unpacked.get({x,y,z}),checkerboard.get({x,y,z}));ASSERT_EQ(worst.get({x,y,z}),checkerboard.get({x,y,z}));
+    }
 }
 TEST(WorldResidency, RemovalInvalidatesGpuOriginAndResidentFaceNeighbors) {
     using namespace vc::voxel;
@@ -95,4 +98,32 @@ TEST(MeshQueue, NearFirstBudgetAndUnconditionalGpuRemoval) {
     meshes=queue.rebuild(world,registry,vc::builtinAtlasLayout(),{0,20,0},1);
     ASSERT_EQ(meshes.size(),2u);EXPECT_TRUE(meshes.front().indices.empty());
     EXPECT_FALSE(meshes.back().indices.empty());EXPECT_EQ(queue.pendingCount(),0u);
+}
+TEST(Streaming, MultiplePlayersKeepUnionResidencyAndRetainEditsWhenTheLastLeaves) {
+    using namespace vc::voxel;
+    const auto registry=vc::builtinBlocks();const TerrainGenerator generator(42,{},registry,1);World world;
+    ChunkStreamer streamer(world,generator,1);const std::array players{Position{-1,20,-1},Position{512,20,512}};
+    const auto settleGroup=[&](std::span<const Position> group) {
+        const auto end=std::chrono::steady_clock::now()+std::chrono::seconds(10);
+        do { streamer.tick(group);if(streamer.settled()) return true;std::this_thread::sleep_for(std::chrono::milliseconds(1)); }
+        while(std::chrono::steady_clock::now()<end);
+        return false;
+    };
+    ASSERT_TRUE(settleGroup(players));EXPECT_EQ(world.chunks().size(),54u);
+    ASSERT_TRUE(world.setBlock({-1,30,-1},registry.require("voxelcraft:stone")));
+    const std::array second{players[1]};ASSERT_TRUE(settleGroup(second));EXPECT_EQ(world.chunks().size(),27u);EXPECT_FALSE(world.loaded({-1,30,-1}));
+    EXPECT_EQ(streamer.cachedCount(),1u);ASSERT_TRUE(settleGroup(players));EXPECT_EQ(world.block({-1,30,-1}),registry.require("voxelcraft:stone"));
+    ASSERT_TRUE(settleGroup({}));EXPECT_TRUE(world.chunks().empty());EXPECT_EQ(streamer.snapshot().block({-1,30,-1}),registry.require("voxelcraft:stone"));
+    EXPECT_EQ(streamer.sample({-1,30,-1}),registry.require("voxelcraft:stone"));
+    EXPECT_EQ(streamer.sample({512,30,512}),generator.sample({512,30,512}));
+    const std::array<Position,9> tooMany{};EXPECT_THROW(streamer.tick(tooMany),std::invalid_argument);
+}
+TEST(WorldResidency, DataRevisionsChangeOnEditsAndReplacementButNotDirtyNeighbors) {
+    using namespace vc::voxel;
+    World world;world.insert(Chunk({0,0,0}));const auto first=world.revision({0,0,0});EXPECT_NE(first,0u);
+    world.insert(Chunk({1,0,0}));EXPECT_EQ(world.revision({0,0,0}),first);
+    ASSERT_TRUE(world.setBlock({31,0,0},1));const auto changed=world.revision({0,0,0});EXPECT_GT(changed,first);
+    const auto neighbor=world.revision({1,0,0});ASSERT_FALSE(world.setBlock({31,0,0},1));EXPECT_EQ(world.revision({0,0,0}),changed);
+    (void)world.remove({0,0,0});EXPECT_EQ(world.revision({0,0,0}),0u);EXPECT_EQ(world.revision({1,0,0}),neighbor);
+    world.insert(Chunk({0,0,0}));EXPECT_GT(world.revision({0,0,0}),changed);EXPECT_EQ(world.revision({1,0,0}),neighbor);
 }

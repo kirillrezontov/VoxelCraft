@@ -8,6 +8,7 @@
 namespace vc { class FileLock; }
 namespace vc::voxel {
 inline constexpr std::uint32_t worldFormatVersion=1, terrainGenerationVersion=3;
+inline constexpr std::size_t maxGameDataBytes=512*1024;
 struct WorldMetadata {
     std::uint64_t seed{12345};
     WorldBounds bounds;
@@ -16,7 +17,7 @@ struct WorldMetadata {
 struct WorldArchive {
     WorldMetadata metadata;
     World world;
-    // Versioned game-owned player/inventory data, bounded to 64 KiB.
+    // Versioned game-owned state, including multiplayer profiles, at most 512 KiB.
     std::string gameData;
     std::uint64_t revision{};
 };

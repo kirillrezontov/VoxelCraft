@@ -123,7 +123,9 @@ TEST(Storage, RejectsChecksummedUnsupportedFormatsAndMalformedRegions) {
 TEST(Storage, EmptyWorldAndGameDataLimits) {
     vc::test::TempDirectory temp;vc::voxel::WorldStore store(temp.path());
     auto registry=vc::builtinBlocks();vc::voxel::World world;
-    EXPECT_THROW(store.save(world,registry,{},std::string(65537,'x')),std::runtime_error);
+    EXPECT_THROW(store.save(world,registry,{},std::string(vc::voxel::maxGameDataBytes+1,'x')),std::runtime_error);
+    const std::string maximum(vc::voxel::maxGameDataBytes,'x');store.save(world,registry,{},maximum);
+    ASSERT_TRUE(store.load(registry));EXPECT_EQ(store.load(registry)->gameData,maximum);
     store.save(world,registry,{});
     const auto archive=store.load(registry);ASSERT_TRUE(archive);EXPECT_TRUE(archive->world.chunks().empty());
 }

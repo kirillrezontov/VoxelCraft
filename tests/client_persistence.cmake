@@ -61,4 +61,70 @@ execute_process(COMMAND "${CLIENT}" --world-dir "${legacy_root}" --radius 1 --fr
 if(NOT legacy_load EQUAL 0 OR NOT legacy_load_log MATCHES "generator version 1" OR NOT legacy_load_log MATCHES "0 errors, 0 warnings")
     message(FATAL_ERROR "Legacy generator version changed on reopen: ${legacy_load_log}")
 endif()
-message(STATUS "Client persisted/reloaded seed, bounds, generator, player and survival mode; conflicting seed/flight rejected; crash released lock and retained snapshot")
+if(MODS_ROOT)
+    set(modded_root "${TEST_ROOT}-modded")
+    file(REMOVE_RECURSE "${modded_root}")
+    foreach(visit RANGE 1 2)
+        execute_process(COMMAND "${CLIENT}" --world-dir "${modded_root}" --mods-dir "${MODS_ROOT}"
+            --radius 1 --frames 6 --require-validation
+            RESULT_VARIABLE modded OUTPUT_VARIABLE modded_out ERROR_VARIABLE modded_log TIMEOUT 25)
+        if(NOT modded EQUAL 0 OR NOT modded_log MATCHES "Loaded 1 mods" OR
+            NOT modded_log MATCHES "demo: Glowstone ready - visit ${visit}" OR
+            NOT modded_log MATCHES "0 errors, 0 warnings")
+            message(FATAL_ERROR "Modded world visit ${visit} failed (${modded}): ${modded_log}")
+        endif()
+    endforeach()
+    execute_process(COMMAND "${CLIENT}" --world-dir "${modded_root}" --no-mods --radius 1 --frames 6 --require-validation
+        RESULT_VARIABLE missing OUTPUT_VARIABLE missing_out ERROR_VARIABLE missing_log TIMEOUT 25)
+    if(NOT missing EQUAL 0 OR NOT missing_log MATCHES "Missing saved mod demo" OR
+        NOT missing_log MATCHES "0 errors, 0 warnings")
+        message(FATAL_ERROR "Missing-mod retention failed (${missing}): ${missing_log}")
+    endif()
+    execute_process(COMMAND "${CLIENT}" --world-dir "${modded_root}" --mods-dir "${MODS_ROOT}"
+        --radius 1 --frames 6 --require-validation
+        RESULT_VARIABLE restored OUTPUT_VARIABLE restored_out ERROR_VARIABLE restored_log TIMEOUT 25)
+    if(NOT restored EQUAL 0 OR NOT restored_log MATCHES "demo: Glowstone ready - visit 3" OR
+        NOT restored_log MATCHES "0 errors, 0 warnings")
+        message(FATAL_ERROR "Reinstalled mod lost its state (${restored}): ${restored_log}")
+    endif()
+    set(upgraded_mods "${TEST_ROOT}-mods-upgraded")
+    file(REMOVE_RECURSE "${upgraded_mods}")
+    file(COPY "${MODS_ROOT}/demo" DESTINATION "${upgraded_mods}")
+    file(WRITE "${upgraded_mods}/demo/mod.json" "{\"id\":\"demo\",\"version\":\"2.0.0\",\"api\":1,\"state_version\":2}")
+    file(WRITE "${upgraded_mods}/demo/init.lua" [=[
+local v=voxelcraft
+return {
+  on_migrate=function(e)
+    assert(e.from_state_version == 1 and e.to_state_version == 2)
+    assert(v.set_state("visits_total",v.get_state("visits")))
+    assert(v.set_state("visits",nil))
+  end,
+  on_load=function()
+    local total=tonumber(v.get_state("visits_total"))+1
+    assert(v.set_state("visits_total",tostring(total)))
+    v.message("Upgraded visits "..total)
+  end
+}
+]=])
+    execute_process(COMMAND "${CLIENT}" --world-dir "${modded_root}" --mods-dir "${upgraded_mods}"
+        --radius 1 --frames 6 --require-validation
+        RESULT_VARIABLE upgrade OUTPUT_VARIABLE upgrade_out ERROR_VARIABLE upgrade_log TIMEOUT 25)
+    if(NOT upgrade EQUAL 0 OR NOT upgrade_log MATCHES "Migrated mod demo state 1 -> 2" OR
+        NOT upgrade_log MATCHES "demo: Upgraded visits 4" OR NOT upgrade_log MATCHES "0 errors, 0 warnings")
+        message(FATAL_ERROR "Mod state migration failed (${upgrade}): ${upgrade_log}")
+    endif()
+    execute_process(COMMAND "${CLIENT}" --world-dir "${modded_root}" --mods-dir "${MODS_ROOT}"
+        --radius 1 --frames 6 --require-validation
+        RESULT_VARIABLE downgrade OUTPUT_VARIABLE downgrade_out ERROR_VARIABLE downgrade_log TIMEOUT 25)
+    if(downgrade EQUAL 0 OR NOT downgrade_log MATCHES "downgrade refused")
+        message(FATAL_ERROR "Mod state downgrade was not rejected: ${downgrade_log}")
+    endif()
+    execute_process(COMMAND "${CLIENT}" --world-dir "${modded_root}" --mods-dir "${upgraded_mods}"
+        --radius 1 --frames 6 --require-validation
+        RESULT_VARIABLE reopen_upgrade OUTPUT_VARIABLE reopen_upgrade_out ERROR_VARIABLE reopen_upgrade_log TIMEOUT 25)
+    if(NOT reopen_upgrade EQUAL 0 OR NOT reopen_upgrade_log MATCHES "demo: Upgraded visits 5" OR
+        reopen_upgrade_log MATCHES "Migrated mod" OR NOT reopen_upgrade_log MATCHES "0 errors, 0 warnings")
+        message(FATAL_ERROR "Migrated state changed after refused downgrade: ${reopen_upgrade_log}")
+    endif()
+endif()
+message(STATUS "Client persisted/reloaded world, player, survival and mod state; conflicts rejected; crash recovery, missing-mod retention and transactional state migration verified")

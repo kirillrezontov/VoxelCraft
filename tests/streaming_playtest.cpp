@@ -3,7 +3,7 @@
 #include "engine/platform/window.hpp"
 #include "engine/renderer/vulkan_renderer.hpp"
 #include "engine/voxel/streaming.hpp"
-#include "engine/voxel/mesh_queue.hpp"
+#include "engine/voxel/mesh_worker.hpp"
 #include "engine/voxel/storage.hpp"
 #include "game/content/atlas.hpp"
 #include "game/content/blocks.hpp"
@@ -27,18 +27,19 @@ int main(int argc,char** argv) {
         auto registry=vc::builtinBlocks();vc::voxel::World world;
         const vc::voxel::TerrainGenerator generator(42,{},registry);
         auto streamer=std::make_unique<vc::voxel::ChunkStreamer>(world,generator,1);
-        vc::voxel::ChunkMeshQueue queue;vc::Camera camera;camera.position={-0.5,66.5,6.5};camera.yaw=0;camera.pitch=-0.65;
+        auto queue=std::make_unique<vc::voxel::BackgroundMeshQueue>(registry,vc::builtinAtlasLayout());
+        vc::Camera camera;camera.position={-0.5,66.5,6.5};camera.yaw=0;camera.pitch=-0.65;
         const auto stone=registry.require("voxelcraft:stone");
         const auto settle=[&] {
             const auto deadline=vc::Window::seconds()+15;
             do {
                 const auto input=window.poll();require(!input.quit,"Streaming playtest interrupted");
                 if(input.resized) renderer.requestResize();
-                streamer->tick(block(camera));queue.collect(world);
-                const auto meshes=queue.rebuild(world,registry,vc::builtinAtlasLayout(),block(camera),2);renderer.updateMeshes(meshes);
+                streamer->tick(block(camera));queue->collect(world);
+                const auto meshes=queue->update(world,block(camera),2);renderer.updateMeshes(meshes);
                 renderer.draw(camera);
                 require(world.chunks().size()<=54,"Streaming resident count exceeded configured bound");
-                if(streamer->settled()&&!queue.pendingCount()) {
+                if(streamer->settled()&&!queue->pendingCount()) {
                     std::size_t expectedMeshes=0,expectedTriangles=0;
                     for(const auto& [p,chunk]:world.chunks()) {
                         (void)p;const auto mesh=vc::voxel::meshChunk(chunk,world,registry,vc::builtinAtlasLayout());
@@ -64,7 +65,8 @@ int main(int argc,char** argv) {
             vc::voxel::WorldStore store(temp.path());store.save(snapshot,registry,{42,{},1});
             auto archive=store.load(registry);require(archive.has_value(),"Streamed snapshot did not load");
             require(archive->world.block(editA)==stone&&archive->world.block(editB)==stone,"Evicted edits were not persisted");
-            streamer.reset();world=std::move(archive->world);renderer.upload({});queue={};
+            streamer.reset();queue.reset();world=std::move(archive->world);renderer.upload({});
+            queue=std::make_unique<vc::voxel::BackgroundMeshQueue>(registry,vc::builtinAtlasLayout());
         }
         streamer=std::make_unique<vc::voxel::ChunkStreamer>(world,generator,1);
         std::vector<vc::voxel::Position> retained;

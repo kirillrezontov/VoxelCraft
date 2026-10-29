@@ -7,14 +7,24 @@ CMake FetchContent pins SDL to `release-3.2.10`, GLM to `1.0.1`, and GoogleTest 
 (commit `4a2d1a8541228a90e02a873dba6a980506c42c03`). Sources and build products stay under `build/`. SDL is linked statically
 in this mode; Vulkan is linked to the system loader. Git tags select exact release
 versions; updates are explicit changes to CMakeLists.txt. The Vulkan SDK/driver and
-platform development libraries remain host prerequisites. EnTT is used only by dynamic actor simulation; ImGui and Lua are not yet dependencies.
+platform development libraries remain host prerequisites. EnTT is used only by dynamic actor simulation; ImGui is not a dependency. Lua 5.4.9 is fetched from its upstream tarball,
+verified with SHA-256, and compiled as C++ for callback RAII error handling.
+nlohmann/json is pinned to v3.12.0 for mod manifests and definitions.
+PNG tiles use stb_image from commit
+`013ac3beddff3dbffafd5177e7972067cd2b5083`, fetched as a single header and checked
+against SHA-256 `594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3`.
+Its [upstream header](https://github.com/nothings/stb/blob/013ac3beddff3dbffafd5177e7972067cd2b5083/stb_image.h)
+includes its MIT/public-domain license. Only PNG support is compiled, with a
+custom bounded allocator. No system PNG package is needed.
 
 `VC_USE_SYSTEM_DEPS=ON` opts into installed CMake packages: SDL3 >=3.2, GLM >=1.0,
-GoogleTest >=1.14. This convenient offline path is not version-reproducible; record
+GoogleTest >=1.14 and nlohmann/json exactly 3.12.0. This convenient offline path is not version-reproducible; record
 the host versions when reporting results. EnTT still fetches if its exact package
 is absent; use an installed 3.14.0 package or `FETCHCONTENT_SOURCE_DIR_ENTT` for an
 offline source checkout. `BUILD_TESTING=OFF` omits GoogleTest.
 `VC_BUILD_CLIENT=OFF` omits SDL and Vulkan entirely for CPU-only builds.
+The `server` preset builds the dedicated server and CPU tests with that setting;
+`VC_BUILD_SERVER=OFF` omits the standalone executable when only a client is wanted.
 
 ## Linux prerequisites
 
@@ -47,11 +57,31 @@ ctest --test-dir build/clang --output-on-failure
 cmake -S . -B build/core -G Ninja -DVC_BUILD_CLIENT=OFF
 cmake --build build/core --parallel 4
 ctest --test-dir build/core --output-on-failure
+
+cmake --preset server
+cmake --build --preset server --parallel 4
+ctest --preset server
+./build/server/bin/voxelcraft-server --no-save --ticks 90
 ```
 
 For sanitizers, configure Clang with `-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined
 -fno-omit-frame-pointer"` and `-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined`.
 LeakSanitizer may require running outside a restricted process sandbox.
+
+When Python 3 is available, CTest also exercises the real server process and,
+in the graphics suite, two actual client executables. Python is optional and is
+not linked to the game. For a longer eight-player transport/edit/reconnect soak:
+
+```sh
+cmake --preset server -DVC_BUILD_SOAK_TOOLS=ON
+cmake --build --preset server --parallel 4
+./build/server/bin/vc_network_soak 600
+```
+
+The tool uses an isolated temporary world and ephemeral loopback port, drives
+eight real TCP sessions at 60 Hz, edits lamps, churns names, saves and verifies
+profile restoration. Its duration accepts 10..14400 seconds; it is outside the
+ordinary test suite.
 
 ## Windows
 
@@ -91,7 +121,10 @@ To require validation instead of skipping missing layers (also works in Release)
 VK_LAYER_VALIDATE_SYNC=1 ./build/debug/bin/voxelcraft --smoke --require-validation
 ```
 
-For CTest integration, use a separate build with `-DVC_ENABLE_GPU_TESTS=ON` and run
+For CTest integration, use `cmake --preset graphics`,
+`cmake --build --preset graphics --parallel 4`, and `ctest --preset graphics`.
+This keeps the display-dependent suite in a separate build. Alternatively, use
+a separate build with `-DVC_ENABLE_GPU_TESTS=ON` and run
 `ctest --test-dir build/graphics -L graphics --output-on-failure` after building.
 `Client.GpuSmoke` requires a desktop, a compatible GPU, the Khronos validation
 layer and screenshot readback. It enables synchronization validation, has a
@@ -111,3 +144,13 @@ directory for the test process. This session used the official
 under `build/tools/validation`, verified against the published SHA-256. The
 downloaded layer is a test tool, not a new application dependency. Nightly is a
 moving release; the exact commit and digest used are recorded in verification.md.
+
+
+Scripted input playtests need stable desktop focus. An isolated compositor can
+avoid interference from active desktop use. The 2026-10-29 continuation used the
+installed KWin virtual backend on a private D-Bus/Wayland session for seven
+interactive tests. The initial automatic minimize/restore smoke required X11. The timed continuation
+fixed restore by also requesting SDL window activation, and all eight strict
+tests now pass on the isolated Wayland display. Activation remains subject to
+desktop policy; the game continues to use the same Vulkan renderer. See the
+[continuation verification](development-session-2026-10-29.md).

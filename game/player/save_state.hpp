@@ -1,7 +1,9 @@
 #pragma once
 #include "game/player/camera.hpp"
+#include "game/player/profile.hpp"
 #include "game/gameplay/items.hpp"
 #include "game/simulation/entity_data.hpp"
+#include "game/modding/save_data.hpp"
 #include <array>
 #include <cstdint>
 #include <string>
@@ -18,6 +20,8 @@ struct PlayerSaveState {
     std::array<SavedItemStack,SurvivalInventory::slotCount> items;
     double worldTime{300};
     std::vector<SavedActor> actors;
+    std::vector<SavedMod> mods;
+    std::vector<PlayerProfile> profiles;
 };
 // Explicit versioned encoding inside the world's transactional game-data payload.
 std::string encodePlayer(const PlayerSaveState& player);

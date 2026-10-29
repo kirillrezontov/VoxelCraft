@@ -6,6 +6,7 @@
 #include "game/gameplay/survival.hpp"
 #include <string_view>
 #include <optional>
+#include <functional>
 
 namespace vc {
 struct UiRect {
@@ -14,6 +15,7 @@ struct UiRect {
 };
 struct SandboxUiLayout {
     static constexpr std::size_t pageCapacity=32;
+    static constexpr std::size_t recipePageCapacity=5;
     float scale{};
     UiRect panel;
     float barX{},barY{};
@@ -25,7 +27,13 @@ struct SandboxUiLayout {
     UiRect recipeButton(std::size_t index) const;
 };
 struct HudGeometry { Mesh colored,textured,foreground; };
-struct SurvivalUiContext { SurvivalState* state;const ItemRegistry* items;const std::vector<Recipe>* recipes; };
+struct SurvivalUiContext {
+    SurvivalState* state;
+    const ItemRegistry* items;
+    const std::vector<Recipe>* recipes;
+    // Optional authoritative-server sink. Local play applies transactions directly.
+    std::function<void(InventoryAction)> request{};
+};
 HudGeometry sandboxHud(const CreativeInventory& inventory,const voxel::BlockRegistry& registry,
     const AtlasLayout& atlas,int width,int height,bool inventoryOpen,std::size_t page=0,
     std::string_view status={},bool settingsOpen=false,const GameSettings& settings={},
@@ -52,6 +60,7 @@ public:
     bool craftingOpen() const { return open_&&craftingOpen_; }
     void closeMenus() { open_=false;dirty_=true; }
     bool takeSettingsChanged();
+    std::vector<std::string> takeCraftedItems();
     void status(std::string message,double now);
     std::optional<HudGeometry> rebuild(const voxel::BlockRegistry& registry,const AtlasLayout& atlas,
         int width,int height,double now);
@@ -61,6 +70,7 @@ private:
     GameSettings settings_;
     bool settingsOpen_{},settingsChanged_{};
     bool craftingOpen_{};
+    std::vector<std::string> craftedItems_;
     SurvivalUiContext* survival_{};
     std::uint64_t itemRevision_{};
     unsigned health_{20};

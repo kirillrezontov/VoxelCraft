@@ -133,7 +133,7 @@ UiRect SandboxUiLayout::backpackCell(std::size_t index) const {
     return {panel.x+(28+static_cast<float>(index%9)*52)*scale,panel.y+(88+static_cast<float>(index/9)*56)*scale,48*scale,48*scale};
 }
 UiRect SandboxUiLayout::recipeButton(std::size_t index) const {
-    if(index>=5) throw std::out_of_range("Crafting UI recipe outside 0..4");
+    if(index>=recipePageCapacity) throw std::out_of_range("Crafting UI recipe outside page");
     return {panel.x+20*scale,panel.y+(76+static_cast<float>(index)*48)*scale,480*scale,40*scale};
 }
 HudGeometry sandboxHud(const CreativeInventory& inventory,const voxel::BlockRegistry& registry,
@@ -191,8 +191,11 @@ HudGeometry sandboxHud(const CreativeInventory& inventory,const voxel::BlockRegi
         rect(hud.colored,layout.panel,background);frame(hud.colored,layout.panel,2*s,gold);
         text(hud.foreground,"CRAFTING",layout.panel.x+20*s,layout.panel.y+18*s,2*s,gold);
         text(hud.foreground,"CLICK A RECIPE - MATERIALS ARE CONSUMED",layout.panel.x+20*s,layout.panel.y+44*s,1.3f*s);
-        for(std::size_t i=0;i<survival->recipes->size()&&i<5;++i) {
-            const auto& recipe=survival->recipes->at(i);const auto area=layout.recipeButton(i);
+        const auto capacity=SandboxUiLayout::recipePageCapacity;
+        const auto pages=std::max<std::size_t>(1,(survival->recipes->size()+capacity-1)/capacity);
+        page=std::min(page,pages-1);
+        for(std::size_t i=0;i<capacity&&page*capacity+i<survival->recipes->size();++i) {
+            const auto& recipe=survival->recipes->at(page*capacity+i);const auto area=layout.recipeButton(i);
             auto trial=survival->state->inventory;const bool available=trial.craft(recipe,*survival->items)==CraftResult::Crafted;
             rect(hud.colored,area,available?glm::vec3(0.12f,0.19f,0.1f):slotColor);frame(hud.colored,area,s,available?gold:glm::vec3(0.3f));
             itemIcon(hud,{area.x+8*s,area.y+5*s,30*s,30*s},survival->items->definition(recipe.output),registry,atlas);
@@ -205,7 +208,8 @@ HudGeometry sandboxHud(const CreativeInventory& inventory,const voxel::BlockRegi
             }
             text(hud.foreground,ingredients,area.x+60*s,area.y+28*s,s);
         }
-        text(hud.foreground,"C / ESC: CLOSE   E: BACKPACK",layout.panel.x+20*s,layout.panel.y+334*s,1.3f*s);
+        text(hud.foreground,"WHEEL: PAGE "+std::to_string(page+1)+'/'+std::to_string(pages),layout.panel.x+20*s,layout.panel.y+316*s,1.3f*s);
+        text(hud.foreground,"C / ESC: CLOSE   E: BACKPACK",layout.panel.x+20*s,layout.panel.y+340*s,1.3f*s);
     } else if(survival&&inventoryOpen) {
         rect(hud.colored,layout.panel,background);frame(hud.colored,layout.panel,2*s,gold);
         text(hud.foreground,"BACKPACK",layout.panel.x+20*s,layout.panel.y+18*s,2*s,gold);
@@ -240,8 +244,8 @@ bool SandboxUiController::process(const SandboxUiInput& input,int width,int heig
     if(input.slot<0||input.slot>9) throw std::invalid_argument("UI slot selection must be 0..9");
     if(survival_&&!survival_->state->alive()) return false;
     if(input.settingsToggle) { open_=!(open_&&settingsOpen_);settingsOpen_=true;craftingOpen_=false;dirty_=true;return true; }
-    if(input.craftingToggle&&survival_) { open_=!(open_&&craftingOpen_);craftingOpen_=true;settingsOpen_=false;dirty_=true;return true; }
-    if(input.toggle) { open_=!(open_&&!settingsOpen_&&!craftingOpen_);settingsOpen_=craftingOpen_=false;dirty_=true;return true; }
+    if(input.craftingToggle&&survival_) { open_=!(open_&&craftingOpen_);craftingOpen_=true;settingsOpen_=false;page_=0;dirty_=true;return true; }
+    if(input.toggle) { open_=!(open_&&!settingsOpen_&&!craftingOpen_);settingsOpen_=craftingOpen_=false;page_=0;dirty_=true;return true; }
     if(open_&&input.close) { open_=false;dirty_=true;return true; }
     if(open_&&settingsOpen_) {
         if(width<=0||height<=0||!input.primary) return false;
@@ -265,23 +269,37 @@ bool SandboxUiController::process(const SandboxUiInput& input,int width,int heig
         return false;
     }
     if(survival_) {
+        if(craftingOpen_&&input.scroll) {
+            const auto capacity=SandboxUiLayout::recipePageCapacity;
+            const auto pages=std::max<std::size_t>(1,(survival_->recipes->size()+capacity-1)/capacity);
+            const auto next=std::clamp(static_cast<std::int64_t>(page_)-input.scroll,std::int64_t{0},static_cast<std::int64_t>(pages-1));
+            if(page_!=static_cast<std::size_t>(next)) { page_=static_cast<std::size_t>(next);dirty_=true; }
+        }
         if(width<=0||height<=0||(!input.primary&&!input.secondary)) return false;
         const SandboxUiLayout layout(width,height);auto& state=survival_->state->inventory;
+        const auto request=[&](InventoryAction action) {
+            if(survival_->request) { survival_->request(action);return InventoryActionResult::NoChange; }
+            return applyInventoryAction(state,action,*survival_->items,*survival_->recipes);
+        };
         if(craftingOpen_) {
-            for(std::size_t i=0;i<survival_->recipes->size()&&i<5;++i) {
+            const auto capacity=SandboxUiLayout::recipePageCapacity;
+            for(std::size_t i=0;i<capacity&&page_*capacity+i<survival_->recipes->size();++i) {
                 if(!input.primary||!layout.recipeButton(i).contains(input.x,input.y)) continue;
-                const auto result=state.craft(survival_->recipes->at(i),*survival_->items);
-                status_=result==CraftResult::Crafted?"CRAFTED":result==CraftResult::NoSpace?"INVENTORY FULL":"MISSING MATERIALS";
+                const auto& recipe=survival_->recipes->at(page_*capacity+i);
+                const auto result=request({InventoryActionKind::Craft,0,0,static_cast<std::uint32_t>(page_*capacity+i)});
+                if(result==InventoryActionResult::Changed) craftedItems_.push_back(survival_->items->definition(recipe.output).identifier);
+                status_=survival_->request?"CRAFT REQUESTED":result==InventoryActionResult::Changed?"CRAFTED":result==InventoryActionResult::NoSpace?"INVENTORY FULL":"MISSING MATERIALS";
                 statusUntil_=0;dirty_=true;
             }
         } else {
             for(std::size_t i=0;i<9;++i) if(layout.hotbarSlot(i).contains(input.x,input.y)) {
                 if(input.primary) dirty_=state.select(i)||dirty_;
-                if(input.secondary) dirty_=state.moveToBackpack(i,*survival_->items)||dirty_;
+                if(input.secondary) dirty_=(request({InventoryActionKind::MoveToBackpack,static_cast<std::uint32_t>(i)})==InventoryActionResult::Changed)||dirty_;
             }
             for(std::size_t i=0;i<27;++i) if(layout.backpackCell(i).contains(input.x,input.y)) {
-                if(input.primary) dirty_=state.swap(9+i,state.selectedSlot())||dirty_;
-                if(input.secondary) dirty_=state.transfer(9+i,state.selectedSlot(),1,*survival_->items)||dirty_;
+                const auto from=static_cast<std::uint32_t>(9+i),to=static_cast<std::uint32_t>(state.selectedSlot());
+                if(input.primary) dirty_=(request({InventoryActionKind::Swap,from,to})==InventoryActionResult::Changed)||dirty_;
+                if(input.secondary) dirty_=(request({InventoryActionKind::TransferOne,from,to})==InventoryActionResult::Changed)||dirty_;
             }
         }
         return false;
@@ -305,6 +323,7 @@ bool SandboxUiController::process(const SandboxUiInput& input,int width,int heig
 }
 void SandboxUiController::status(std::string message,double now) { status_=std::move(message);statusUntil_=now+4;dirty_=true; }
 bool SandboxUiController::takeSettingsChanged() { return std::exchange(settingsChanged_,false); }
+std::vector<std::string> SandboxUiController::takeCraftedItems() { return std::exchange(craftedItems_,{}); }
 std::optional<HudGeometry> SandboxUiController::rebuild(const voxel::BlockRegistry& registry,const AtlasLayout& atlas,
         int width,int height,double now) {
     if(!status_.empty()&&statusUntil_==0) statusUntil_=now+4;

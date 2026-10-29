@@ -25,7 +25,8 @@ void validateMods(const std::vector<SavedMod>& mods) {
     if(mods.size()>32) throw std::runtime_error("Too many saved mods");
     std::set<std::string> ids;std::size_t bytes=0;
     for(const auto& mod:mods) {
-        if(!validModId(mod.id)||!validModVersion(mod.version)||!ids.insert(mod.id).second||mod.state.size()>64)
+        if(!validModId(mod.id)||!validModVersion(mod.version)||!ids.insert(mod.id).second||mod.state.size()>64||
+            !mod.stateVersion||mod.stateVersion>65535)
             throw std::runtime_error("Invalid saved mod metadata");
         for(const auto& [key,value]:mod.state) {
             if(key.empty()||key.size()>64||value.size()>256) throw std::runtime_error("Invalid saved mod state");

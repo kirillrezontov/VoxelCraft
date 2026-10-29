@@ -15,8 +15,11 @@ public:
     Position position() const { return position_; }
     BlockId get(LocalPosition p) const { return blocks_[blockIndex(p)]; }
     void set(LocalPosition p, BlockId id) { blocks_[blockIndex(p)] = id; }
+    std::uint64_t revision() const { return revision_; }
 private:
+    friend class World;
     Position position_;
+    std::uint64_t revision_{}; // Process-local ownership version, never saved.
     std::array<BlockId, chunkVolume> blocks_{};
 };
 class World {
@@ -29,6 +32,7 @@ public:
     BlockId block(Position p) const;
     bool loaded(Position p) const;
     const Chunk* findChunk(Position chunk) const;
+    std::uint64_t revision(Position chunk) const;
     // Only resident cells can be changed; false means unchanged or unavailable.
     bool setBlock(Position p, BlockId id);
     bool modified(Position chunk) const { return modified_.contains(chunk); }
@@ -39,5 +43,6 @@ private:
     std::map<Position, Chunk> chunks_;
     std::set<Position> dirty_;
     std::set<Position> modified_;
+    std::uint64_t nextRevision_{};
 };
 }

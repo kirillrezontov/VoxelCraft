@@ -9,6 +9,7 @@ class PackedChunk {
 public:
     explicit PackedChunk(const Chunk& chunk);
     Chunk unpack() const;
+    BlockId get(LocalPosition position) const;
     std::size_t bytes() const { return runs_.size()*sizeof(Run)+raw_.size()*sizeof(BlockId); }
 private:
     struct Run { BlockId block;std::uint16_t length; };
@@ -26,7 +27,13 @@ public:
     // Main-thread ownership: only generation happens on the worker. Inserts at
     // most integrationBudget chunks per tick; unloaded meshes are dirtied by World.
     void tick(Position player,std::size_t integrationBudget=2);
+    // Union residency for up to eight players. Empty input evicts residency
+    // while retaining edited data; priority is distance to the nearest player.
+    void tick(std::span<const Position> players,std::size_t integrationBudget=2);
     World snapshot() const;
+    // Spawn/profile validation can consult retained edits without loading an
+    // entire resident region or mistaking unavailable data for a solid floor.
+    BlockId sample(Position position) const;
     bool settled() const;
     std::size_t wantedCount() const { return wanted_.size(); }
     std::size_t cachedCount() const { return retained_.size(); }
@@ -36,8 +43,10 @@ private:
     World& world_;
     int radius_;
     std::uint32_t generationVersion_;
+    TerrainGenerator generator_;
     TerrainWorker worker_;
-    std::optional<Position> center_;
+    bool initialized_{};
+    std::vector<Position> centers_;
     std::vector<Position> ordered_;
     std::set<Position> wanted_;
     std::map<Position,PackedChunk> retained_;

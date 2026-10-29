@@ -3,8 +3,10 @@
   "configurePresets": [
     {"name": "debug", "generator": "Ninja", "binaryDir": "${sourceDir}/build/debug", "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}},
     {"name": "release", "inherits": "debug", "binaryDir": "${sourceDir}/build/release", "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}},
-    {"name": "relwithdebinfo", "inherits": "debug", "binaryDir": "${sourceDir}/build/relwithdebinfo", "cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo"}}
+    {"name": "relwithdebinfo", "inherits": "debug", "binaryDir": "${sourceDir}/build/relwithdebinfo", "cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo"}},
+    {"name": "graphics", "inherits": "debug", "binaryDir": "${sourceDir}/build/graphics", "cacheVariables": {"VC_ENABLE_GPU_TESTS": "ON"}},
+    {"name": "server", "inherits": "debug", "binaryDir": "${sourceDir}/build/server", "cacheVariables": {"VC_BUILD_CLIENT": "OFF"}}
   ],
-  "buildPresets": [{"name": "debug", "configurePreset": "debug"}, {"name": "release", "configurePreset": "release"}, {"name": "relwithdebinfo", "configurePreset": "relwithdebinfo"}],
-  "testPresets": [{"name": "debug", "configurePreset": "debug", "output": {"outputOnFailure": true}}, {"name": "release", "configurePreset": "release", "output": {"outputOnFailure": true}}]
+  "buildPresets": [{"name": "debug", "configurePreset": "debug"}, {"name": "release", "configurePreset": "release"}, {"name": "relwithdebinfo", "configurePreset": "relwithdebinfo"}, {"name": "graphics", "configurePreset": "graphics"}, {"name": "server", "configurePreset": "server"}],
+  "testPresets": [{"name": "debug", "configurePreset": "debug", "output": {"outputOnFailure": true}}, {"name": "release", "configurePreset": "release", "output": {"outputOnFailure": true}}, {"name": "graphics", "configurePreset": "graphics", "filter": {"include": {"label": "graphics"}}, "output": {"outputOnFailure": true}}, {"name": "server", "configurePreset": "server", "output": {"outputOnFailure": true}}]
 }

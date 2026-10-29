@@ -1,0 +1,38 @@
+{
+  "blocks": [
+    {
+      "id": "demo:glowstone",
+      "texture": "demo:glowstone",
+      "color": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "emission": 12,
+      "mining": {
+        "seconds": 0.8,
+        "tool": "pickaxe",
+        "tier": 1,
+        "drop": "demo:glowstone",
+        "drop_count": 1
+      }
+    }
+  ],
+  "recipes": [
+    {
+      "name": "GLOWSTONE",
+      "ingredients": {
+        "voxelcraft:dirt": 1,
+        "voxelcraft:coal": 1
+      },
+      "output": "demo:glowstone",
+      "count": 1
+    }
+  ],
+  "textures": [
+    {
+      "id": "demo:glowstone",
+      "file": "textures/glowstone.png"
+    }
+  ]
+}

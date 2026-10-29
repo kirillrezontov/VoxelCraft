@@ -2,10 +2,12 @@
 #include "game/player/controller.hpp"
 #include "game/player/save_state.hpp"
 #include "game/player/spawn.hpp"
+#include "engine/voxel/streaming.hpp"
 #include "game/ui/sandbox_ui.hpp"
 #include "game/content/atlas.hpp"
 #include "game/content/blocks.hpp"
 #include <gtest/gtest.h>
+#include <cmath>
 
 namespace {
 vc::voxel::RayHit hit(vc::voxel::Position p) { return {p,{0,1,0},1}; }
@@ -136,4 +138,30 @@ TEST(Spawn, AvoidsEditedObstructionsAndUnsupportedHeights) {
     spawn=vc::findSpawn(generator,blocks,&edits);EXPECT_FALSE(spawn.x==0.5&&spawn.z==0.5);
     const vc::voxel::TerrainGenerator far(42,{2000000000000000LL,2000000000000000LL},blocks);
     EXPECT_THROW(vc::findSpawn(far,blocks),std::runtime_error);
+}
+TEST(Spawn, AvoidsOtherBodiesAndConsultsRetainedEditsWithoutResidency) {
+    const auto blocks=vc::builtinBlocks();const vc::voxel::TerrainGenerator generator(42,{},blocks,2);
+    vc::voxel::World world;const auto initial=vc::findSpawn(generator,blocks);
+    vc::PlayerController first;first.camera.position=initial;const std::array bodies{first.bounds()};
+    const auto next=vc::findSpawn(generator,blocks,&world,bodies);vc::PlayerController second;second.camera.position=next;
+    EXPECT_FALSE(first.bounds().intersects(second.bounds()));
+    const auto x=static_cast<std::int64_t>(std::floor(initial.x)),z=static_cast<std::int64_t>(std::floor(initial.z)),y=generator.surfaceY(x,z)+1;
+    const vc::voxel::Position blocked{x,y,z};world.insert(generator.generate(vc::voxel::chunkPosition(blocked)));
+    ASSERT_TRUE(world.setBlock(blocked,blocks.require("voxelcraft:stone")));
+    const std::array retained{vc::voxel::chunkPosition(blocked)};vc::voxel::ChunkStreamer streamer(world,generator,1);streamer.retain(retained);
+    streamer.tick(std::span<const vc::voxel::Position>{});EXPECT_TRUE(world.chunks().empty());
+    const auto restored=vc::findSpawn(generator,blocks,streamer);EXPECT_NE(restored,initial);EXPECT_TRUE(world.chunks().empty());
+}
+TEST(SurvivalUi, RemoteActionsRequestServerTransactionsWithoutChangingTheMirror) {
+    const auto blocks=vc::builtinBlocks();const auto items=vc::builtinItems(blocks);const auto recipes=vc::builtinRecipes(items);
+    vc::SurvivalState state;ASSERT_TRUE(state.inventory.add(items.require("voxelcraft:log"),1,items));
+    vc::CreativeInventory creative(blocks);std::vector<vc::InventoryAction> actions;
+    vc::SurvivalUiContext context{&state,&items,&recipes,[&](auto action){actions.push_back(action);}};
+    vc::SandboxUiController ui(creative,{},&context);const vc::SandboxUiLayout layout(1280,720);
+    vc::SandboxUiInput toggle;toggle.craftingToggle=true;EXPECT_TRUE(ui.process(toggle,1280,720));
+    auto area=layout.recipeButton(0);vc::SandboxUiInput click;click.primary=true;click.x=area.x+1;click.y=area.y+1;ui.process(click,1280,720);
+    ASSERT_EQ(actions.size(),1u);EXPECT_EQ(actions[0].kind,vc::InventoryActionKind::Craft);EXPECT_EQ(actions[0].recipe,0u);
+    EXPECT_EQ(state.inventory.count(items.require("voxelcraft:log")),1u);EXPECT_EQ(state.inventory.count(items.require("voxelcraft:planks")),0u);EXPECT_TRUE(ui.takeCraftedItems().empty());
+    EXPECT_EQ(vc::applyInventoryAction(state.inventory,actions[0],items,recipes),vc::InventoryActionResult::Changed);
+    EXPECT_EQ(state.inventory.count(items.require("voxelcraft:planks")),4u);
 }

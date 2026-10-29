@@ -1,5 +1,6 @@
 #include "engine/voxel/streaming.hpp"
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <stdexcept>
 
@@ -32,6 +33,12 @@ Chunk PackedChunk::unpack() const {
     }
     return chunk;
 }
+BlockId PackedChunk::get(LocalPosition p) const {
+    const auto index=blockIndex(p);if(!raw_.empty()) return raw_.at(index);
+    std::size_t cursor=0;
+    for(const auto& run:runs_) { cursor+=run.length;if(index<cursor) return run.block; }
+    throw std::logic_error("Invalid retained chunk payload");
+}
 std::vector<Position> streamingRegion(Position player,WorldBounds bounds,int radius,std::uint32_t generationVersion) {
     bounds.validate();
     if(radius<1||radius>6) throw std::invalid_argument("Streaming radius must be 1..6 chunks");
@@ -63,17 +70,35 @@ std::vector<Position> streamingRegion(Position player,WorldBounds bounds,int rad
     return result;
 }
 ChunkStreamer::ChunkStreamer(World& world,TerrainGenerator generator,int radius)
-    :world_(world),radius_(radius),generationVersion_(generator.version()),worker_(std::move(generator)) {
+    :world_(world),radius_(radius),generationVersion_(generator.version()),generator_(generator),worker_(std::move(generator)) {
     if(radius<1||radius>6) throw std::invalid_argument("Streaming radius must be 1..6 chunks");
 }
 void ChunkStreamer::retain(std::span<const Position> chunks) {
     for(const auto p:chunks) if(const auto* chunk=world_.findChunk(p)) retained_.insert_or_assign(p,PackedChunk(*chunk));
 }
 void ChunkStreamer::tick(Position player,std::size_t integrationBudget) {
+    const std::array players{player};tick(players,integrationBudget);
+}
+void ChunkStreamer::tick(std::span<const Position> players,std::size_t integrationBudget) {
     if(!integrationBudget||integrationBudget>128) throw std::invalid_argument("Streaming integration budget must be 1..128");
-    const auto center=regionCenter(player,world_.bounds());
-    if(!center_||*center_!=center) {
-        ordered_=streamingRegion(player,world_.bounds(),radius_,generationVersion_);wanted_={ordered_.begin(),ordered_.end()};center_=center;
+    if(players.size()>8) throw std::invalid_argument("Streaming supports at most eight active centers");
+    std::vector<Position> centers;centers.reserve(players.size());
+    for(const auto player:players) centers.push_back(regionCenter(player,world_.bounds()));
+    std::sort(centers.begin(),centers.end());centers.erase(std::unique(centers.begin(),centers.end()),centers.end());
+    if(!initialized_||centers_!=centers) {
+        std::set<Position> wanted;
+        for(const auto player:players) { const auto region=streamingRegion(player,world_.bounds(),radius_,generationVersion_);wanted.insert(region.begin(),region.end()); }
+        ordered_={wanted.begin(),wanted.end()};wanted_=std::move(wanted);centers_=std::move(centers);initialized_=true;
+        const auto distance=[&](Position p) {
+            double best=std::numeric_limits<double>::infinity();
+            for(const auto center:centers_) {
+                const auto x=static_cast<double>(p.x)-static_cast<double>(center.x),y=static_cast<double>(p.y)-static_cast<double>(center.y),
+                    z=static_cast<double>(p.z)-static_cast<double>(center.z);
+                best=std::min(best,x*x+y*y+z*z);
+            }
+            return best;
+        };
+        std::sort(ordered_.begin(),ordered_.end(),[&](Position a,Position b){const auto da=distance(a),db=distance(b);return da==db?a<b:da<db;});
         std::vector<Position> evict;
         for(const auto& [p,chunk]:world_.chunks()) {
             if(wanted_.contains(p)) continue;
@@ -107,8 +132,14 @@ World ChunkStreamer::snapshot() const {
     (void)snapshot.takeDirtyChunks();
     return snapshot;
 }
+BlockId ChunkStreamer::sample(Position p) const {
+    if(world_.loaded(p)) return world_.block(p);
+    if(!world_.bounds().contains(p.y)) return air;
+    const auto retained=retained_.find(chunkPosition(p));
+    return retained==retained_.end()?generator_.sample(p):retained->second.get(localPosition(p));
+}
 bool ChunkStreamer::settled() const {
-    return center_.has_value()&&worker_.pendingCount()==0&&std::all_of(ordered_.begin(),ordered_.end(),[&](Position p){return world_.findChunk(p)!=nullptr;});
+    return initialized_&&worker_.pendingCount()==0&&std::all_of(ordered_.begin(),ordered_.end(),[&](Position p){return world_.findChunk(p)!=nullptr;});
 }
 std::size_t ChunkStreamer::cachedBytes() const {
     std::size_t bytes=0;for(const auto& [p,chunk]:retained_) { (void)p;bytes+=chunk.bytes(); }return bytes;

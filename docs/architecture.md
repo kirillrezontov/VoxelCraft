@@ -1,7 +1,8 @@
 # Architecture: viewer, interaction and persistent sandbox
 
-`client/main.cpp` is the composition root: CLI parsing, startup, fixed-region
-generation, meshing, upload, event loop, diagnostics and smoke-test sequencing.
+`client/main.cpp` composes local play; shared CLI/preferences and the connected
+loop live in `client/options.*`, `preferences.*`, and `network_client.*`.
+`server/main.cpp` composes the headless host and console lifecycle.
 It owns the window before the renderer, ensuring GPU resources and the Vulkan
 surface are destroyed before SDL's window and subsystem.
 
@@ -10,6 +11,10 @@ surface are destroyed before SDL's window and subsystem.
 | `engine/core/log.hpp` | Small stderr logging interface | Standard library |
 | `engine/platform` | SDL window, input snapshot, relative mouse, timing, assets, surface | SDL3, Vulkan headers for surface integration |
 | `engine/platform/file_lock.*` | Process-owned save lock, released by the OS on exit/crash | Native OS APIs, isolated here; no SDL/Vulkan |
+| `engine/platform/tcp.*`, `stop_signal.*` | Owning nonblocking sockets and console-stop scope | POSIX/WinSock/CRT APIs; no SDL/Vulkan |
+| `engine/network` | Bounded framing, partial I/O and endpoint parsing | CPU platform sockets |
+| `game/network` | Strict value protocol, content matching, mirrored remote state | CPU game/content/network services |
+| `server/host.*` | Authoritative players, survival, streaming, actors, mods and snapshots | CPU services only |
 | `engine/voxel` | Registry, coordinates, chunks, world, generator, CPU mesher | GLM and standard library |
 | `engine/voxel/storage.*` | Versioned whole-world snapshots and compressed regions | CPU world, binary codec, platform file lock |
 | `engine/renderer/mesh.hpp` | CPU vertex/index payload and integer mesh origin | GLM and standard library; no Vulkan |
@@ -242,12 +247,15 @@ support for RGBA8 sRGB in addition to the device features above.
 
 Sampling is nearest, without anisotropy or mipmaps; no optional device features
 are required. Gutters duplicate edge/corner pixels to isolate tiles. Distance
-aliasing is a known limitation. There is no image-decoder dependency or texture
-file format yet; these are code-generated built-in textures, not an asset loader.
+aliasing is a known limitation. Built-in textures remain code-generated. Mod PNG tiles use a hash-pinned
+PNG-only decoder with bounded dimensions/file/decoder allocations. A CPU
+ContentAtlas combines built-in and external tiles, preserving built-in indices
+and rebuilding gutters; the client supplies its image and layout consistently
+to the renderer, mesher and HUD.
 See [ADR 0002](decisions/0002-texture-atlas-and-validation.md).
 
-There is no generic rendering backend, general job system, ImGui overlay or Lua
-runtime. EnTT now serves dynamic actors only. Other dependencies will be introduced for concrete
+There is no generic rendering backend, general job system or ImGui overlay.
+Lua serves controlled mod hooks; EnTT serves dynamic actors only. Other dependencies will be introduced for concrete
 milestones. See [the decisions](decisions/0001-v01-foundation.md).
 
 ## World expansion and lighting
@@ -279,3 +287,43 @@ and instance values, culls conservatively, batches by model, rotates normals and
 applies per-vertex sway/instance phase. One coherent instance buffer updates after
 the frame fence; terrain/HUD use identity instance zero. Vulkan never knows EnTT
 handles or creature rules. See [ADR0009](decisions/0009-living-world.md).
+
+
+## Modding
+
+`game/modding/runtime.*` owns pack discovery, validated declarative content and
+one bounded Lua state per scripted pack. It depends on CPU gameplay, not platform,
+renderer or EnTT. The client registers packs before loading world palettes,
+installs items/recipes before restoring inventories, and dispatches notifications
+after successful player actions. UI reports successful crafted item IDs by value.
+
+Lua callbacks stage block edits, an inventory copy, namespaced persistent state
+and messages. Only a successful protected call commits them; errors disable the
+script and preserve other packs. World-owned dirty tracking drives existing
+lighting/mesh queues after script edits. Scripts cannot touch Vulkan or World
+ownership. Player payload v7 shares mod state/schema metadata with transactional
+world snapshots, retaining missing pack records and reading previous versions.
+`on_migrate` runs state-only schema upgrades in fresh VMs and commits the entire
+restored mod set atomically. Declarative mining rules install after items, using
+the gameplay-owned validation and collection transaction. ContentAtlas and PNG
+loading remain CPU services; only the renderer uploads atlas pixels.
+See [modding](modding-design.md) and [ADR0010](decisions/0010-modding-foundation.md).
+
+## Authoritative multiplayer
+
+Host owns a shared CPU world and up to eight independent controllers/survival
+states. The streaming worker serves the union of player regions. World-owned
+data revisions change on insert/edit, independently of neighbor mesh dirtiness.
+The server sends revisioned compressed chunks, unloads and 20 Hz snapshots.
+The client mirrors values, owns rendering/lighting/meshing, smooths authoritative
+motion and responds immediately to look input. Movement prediction remains planned.
+
+Client commands contain intent and recipe/slot requests; quantities, placement,
+mining work, damage and recipes are validated and applied by Host. The shared UI
+can send inventory transactions to the server without mutating its item mirror;
+offline play executes those same transactions directly. Health/items are private
+per-recipient snapshots. Named profiles persist with world/mod/actor state in
+payload v9, while retaining earlier formats and offline base-player state.
+The standalone host has no SDL/Vulkan dependency. Native socket/signal code stays
+in the platform layer. See [multiplayer](multiplayer.md) and
+[ADR0013](decisions/0013-authoritative-multiplayer.md).

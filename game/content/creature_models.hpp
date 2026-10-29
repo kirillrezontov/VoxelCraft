@@ -5,4 +5,5 @@
 namespace vc {
 // Grazer, stalker and dropped-item models, matching ActorView model indices.
 std::array<Mesh,3> builtinCreatureModels();
+Mesh playerAvatarModel();
 }

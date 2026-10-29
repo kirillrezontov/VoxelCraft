@@ -8,11 +8,13 @@ struct MiningRule {
     ToolKind tool{ToolKind::None};
     unsigned requiredTier{};
     std::optional<ItemId> drop;
+    std::uint16_t dropCount{1};
 };
 class MiningRules {
 public:
     MiningRules(const voxel::BlockRegistry& blocks,const ItemRegistry& items);
     const MiningRule& rule(voxel::BlockId id) const { return rules_.at(id); }
+    void set(voxel::BlockId block,MiningRule rule,const ItemRegistry& items);
 private:
     std::vector<MiningRule> rules_;
 };

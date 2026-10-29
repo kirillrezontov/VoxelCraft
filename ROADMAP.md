@@ -1,6 +1,6 @@
 # VoxelCraft Development Roadmap
 
-## Current Milestone: v0.6 — Living World (development)
+## Current Milestone: v0.8 — Multiplayer (development)
 
 The persistent creative sandbox is implemented, and the optional survival slice
 now provides a real resource/tool progression. These are development checkpoints;
@@ -49,11 +49,43 @@ sustained human playtesting and Windows execution remain pending.
 - [ ] Sustained human gameplay/balance and Windows execution
 - [ ] Pathfinding, richer behaviors, dynamic body collisions and an ecosystem
 
+### Implemented v0.7 foundation
+
+- [x] Deterministic pack discovery with exact dependencies, API/version validation
+- [x] Declarative namespaced blocks, items, tools and transactional recipes
+- [x] Paged crafting menu for added recipes and successful-craft notifications
+- [x] Controlled Lua load/tick/place/break/craft hooks with staged gameplay changes
+- [x] Lua memory/instruction limits, hook rollback and script-disable diagnostics
+- [x] Client mod options, content-before-save resolution and persistent pack state
+- [x] Player payload v6 with v1..v5 reading and missing-mod data retention
+- [x] Example glowstone pack and API/content documentation
+- [x] CPU/sanitizer coverage and strict SDL/Vulkan modded crafting/persistence checks
+- [ ] Manual modded/survival playtests and Windows execution
+- [x] Explicit state schemas, transactional Lua migrations and downgrade rejection
+- [x] Declarative mining time, required tool/tier, drops and quantities
+- [x] External 16×16 PNG tiles, bounded decoder and shared repacked atlas
+- [x] Explicit API-1 development compatibility policy
+
+### Implemented v0.8 foundation
+
+- [x] Dedicated 60 Hz server with no SDL/Vulkan initialization or linkage
+- [x] Portable nonblocking TCP, bounded framing and backpressure
+- [x] Content/version handshake and server-owned player movement/edit validation
+- [x] Up to eight players with independent persistent names/poses/hotbars
+- [x] Multiple streaming centers, revisioned compressed chunks and unloads
+- [x] Shared day/creature state, visible animated player models and connected Vulkan client
+- [x] F5/autosave/console-interrupt snapshots and reconnect persistence
+- [x] Two real loopback players and strict SDL/Vulkan shared custom-block playtest
+- [x] Server-authoritative survival mining/crafting/health/private inventories and respawn
+- [ ] Client prediction, latency/bandwidth tuning and network soak tests
+- [ ] Authenticated identity, encryption, internet hosting and server administration
+- [ ] Windows execution and sustained human LAN playtesting
+
 ### Next development step
 
-Modding foundation: declarative content, controlled Lua hooks and mod discovery,
-with explicit dependency/version/error handling. Keep existing worlds readable.
-See the [session record](docs/development-session-2026-10-28.md) for executed checks.
+Verify connected survival and improve latency/bandwidth while preserving local
+play. See the [timed session record](docs/development-session-five-hour-2026-10-29.md)
+for executed checks and the fixed stopping time.
 
 ## v0.3 — Persistent Sandbox (implemented development foundation)
 
@@ -163,11 +195,12 @@ Biomes, caves, trees, small ruins, direct sky/block lighting and static water.
 ### v0.6 — Living World (implemented foundation above)
 EnTT actors, basic animal/enemy AI, combat, loot, food and animated instances.
 
-### v0.7 — Modding
-Lua API, content registration, mod loader.
+### v0.7 — Modding (implemented foundation above)
+Declarative content, Lua hooks, mod discovery and saved state; stabilization continues.
 
 ### v0.8 — Multiplayer
-Dedicated server, networking, synchronization.
+Dedicated creative/survival server, networking and synchronization implemented
+above; stabilization continues.
 
 ### v0.9 — Advanced Voxels
 Composite blocks, multiblock objects, custom shapes.

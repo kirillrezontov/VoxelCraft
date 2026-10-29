@@ -11,6 +11,7 @@
 #include "game/player/save_state.hpp"
 #include "game/player/spawn.hpp"
 #include "game/ui/sandbox_ui.hpp"
+#include "game/modding/runtime.hpp"
 #include "tests/temp_directory.hpp"
 #include <SDL3/SDL_main.h>
 #include <stdexcept>
@@ -31,9 +32,11 @@ void button(vc::Window& window,Uint8 which,bool down,float x=0,float y=0) {
 }
 int main(int argc,char** argv) {
     try {
-        vc::Window window;vc::VulkanRenderer renderer(window,vc::builtinAtlas(),true);
-        auto blocks=vc::builtinBlocks();auto items=vc::builtinItems(blocks);const auto recipes=vc::builtinRecipes(items);
-        const vc::MiningRules rules(blocks,items);vc::SurvivalState state;
+        vc::Window window;
+        auto blocks=vc::builtinBlocks();vc::ModRuntime mods(argc>4?vc::utf8Path(argv[4]):std::filesystem::path{},blocks);
+        const auto atlas=mods.atlas().layout();vc::VulkanRenderer renderer(window,mods.atlas().image(),true);
+        auto items=vc::builtinItems(blocks);auto recipes=vc::builtinRecipes(items);mods.installItems(items,blocks,recipes);
+        vc::MiningRules rules(blocks,items);mods.installMining(rules,blocks,items);vc::SurvivalState state;
         vc::CreativeInventory creative(blocks);vc::SurvivalUiContext context{&state,&items,&recipes};vc::SandboxUiController ui(creative,{},&context);
         vc::voxel::World world;
         for(int x=-1;x<=0;++x) for(int z=-1;z<=0;++z) {
@@ -45,6 +48,11 @@ int main(int argc,char** argv) {
         for(int z=-2;z>=-4;--z) world.setBlock({-1,2,z},blocks.require("voxelcraft:stone"));
         world.setBlock({-1,2,-5},blocks.require("voxelcraft:iron_ore"));
         vc::PlayerController player;player.camera.position={-0.5,2.62,2.5};player.camera.yaw=player.camera.pitch=0;
+        const auto dispatch=[&](const vc::ModEvent& event) {
+            for(const auto& message:mods.dispatch(event,{world,blocks,items,&state,player.bounds()})) vc::log(message);
+            require(mods.takeDiagnostics().empty(),"Mod script failed during survival playtest");
+        };
+        dispatch({vc::ModEventKind::Load});
         const vc::voxel::TerrainGenerator spawnGenerator(42,{0,0},blocks);
         vc::voxel::ChunkMeshQueue meshes;
         const auto step=[&](vc::Input input,const std::filesystem::path& screenshot=std::filesystem::path{}) {
@@ -59,22 +67,29 @@ int main(int argc,char** argv) {
                 window.pointerMode(ui.open());window.capture(!ui.open());input.forward=input.right=input.up=input.mouseX=input.mouseY=0;
                 input.destroy=input.place=input.jump=false;input.captured=!ui.open();
             }
+            for(auto& id:ui.takeCraftedItems()) dispatch({vc::ModEventKind::Craft,{},std::move(id)});
             player.camera.fieldOfView=static_cast<float>(ui.settings().fieldOfView);player.camera.mouseSensitivity=ui.settings().mouseSensitivity;player.camera.invertY=ui.settings().invertY;
             if(state.alive()) {
                 player.update({{input.forward,input.right,input.up,input.mouseX,input.mouseY},input.jump,false,input.captured},1.0/60,world,blocks);
                 if(state.land(player.landingSpeed)&&!state.alive()) { ui.closeMenus();window.pointerMode(true);window.capture(false); }
             }
+            dispatch({vc::ModEventKind::Tick,{}, {},1.0/60});
             auto hit=vc::voxel::raycast(world,player.camera.position,player.camera.forward());
+            const auto broken=hit?blocks.definition(world.block(hit->block)).identifier:std::string{};
             const auto mined=state.mine(input.destroyHeld&&input.captured&&!ui.open(),hit,1.0/60,world,items,rules);
+            if(mined.changed) dispatch({vc::ModEventKind::Break,hit->block,broken});
             if(!mined.changed&&hit&&input.place&&!input.destroyHeld&&!ui.open()&&state.alive()) {
                 const auto& selected=state.inventory.selected();const auto block=selected.empty()?vc::voxel::air:items.definition(selected.item).block.value_or(vc::voxel::air);
-                if(vc::placeBlock(world,blocks,*hit,block,player.bounds())) state.inventory.consumeSelected();
+                if(vc::placeBlock(world,blocks,*hit,block,player.bounds())) {
+                    state.inventory.consumeSelected();
+                    dispatch({vc::ModEventKind::Place,*vc::voxel::offsetPosition(hit->block,hit->normal),blocks.definition(block).identifier});
+                }
             }
             if(mined.changed) hit=vc::voxel::raycast(world,player.camera.position,player.camera.forward());
-            meshes.collect(world);const auto replacements=meshes.rebuild(world,blocks,vc::builtinAtlasLayout(),{-1,2,0},4);renderer.updateMeshes(replacements);
+            meshes.collect(world);const auto replacements=meshes.rebuild(world,blocks,atlas,{-1,2,0},4);renderer.updateMeshes(replacements);
             renderer.setSelection(hit&&!ui.open()?std::optional(glm::i64vec3(hit->block.x,hit->block.y,hit->block.z)):std::nullopt);
             renderer.setProgressIndicator(!ui.open()&&state.mining()?std::optional(static_cast<float>(state.miningProgress())):std::nullopt);
-            if(auto hud=ui.rebuild(blocks,vc::builtinAtlasLayout(),width,height,vc::Window::seconds())) renderer.setHud(hud->colored,hud->textured,!ui.open(),hud->foreground);
+            if(auto hud=ui.rebuild(blocks,atlas,width,height,vc::Window::seconds())) renderer.setHud(hud->colored,hud->textured,!ui.open(),hud->foreground);
             return renderer.draw(player.camera,screenshot);
         };
         const auto await=[&](auto ready) {
@@ -136,6 +151,38 @@ int main(int argc,char** argv) {
         if(argc>3) require(step(window.poll(),vc::utf8Path(argv[3])),"Death screenshot failed");
         const auto before=state.inventory.save(items);key(window,SDL_SCANCODE_R,true);step(await([](const auto& input){return input.respawn;}));key(window,SDL_SCANCODE_R,false);frames(3);
         require(state.alive()&&state.health()==20&&!ui.open()&&state.inventory.save(items)==before,"R respawn lost inventory or failed to restore play");
+        if(argc>4) {
+            require(state.inventory.add(items.require("voxelcraft:dirt"),1,items)&&state.inventory.add(items.require("voxelcraft:coal"),1,items),"Could not supply mod recipe ingredients");
+            menu(SDL_SCANCODE_C);
+            SDL_Event wheel{};wheel.type=SDL_EVENT_MOUSE_WHEEL;wheel.wheel.windowID=window.id();wheel.wheel.y=-1;push(wheel);
+            step(await([](const auto& input){return input.scroll==-1;}));require(ui.page()==1,"SDL wheel did not expose mod recipe page");
+            layout=vc::SandboxUiLayout(window.pixelSize().first,window.pixelSize().second);click(layout.recipeButton(0));
+            const auto glowstone=items.require("demo:glowstone");require(state.inventory.count(glowstone)==1,"Mod recipe did not craft glowstone");
+            if(argc>5) require(step(window.poll(),vc::utf8Path(argv[5])),"Mod crafting screenshot failed");
+            menu(SDL_SCANCODE_C);
+            bool selected=false;
+            for(std::size_t i=0;i<9;++i) if(!state.inventory.slots()[i].empty()&&state.inventory.slots()[i].item==glowstone) {
+                select(static_cast<int>(i)+1);selected=true;break;
+            }
+            require(selected,"Crafted mod block was not in hotbar");
+            player=vc::PlayerController{};player.camera.position={-0.5,2.62,2.5};player.camera.pitch=-0.75;frames(2);
+            const auto target=vc::voxel::raycast(world,player.camera.position,player.camera.forward());require(target.has_value(),"No floor for mod block placement");
+            const auto cell=vc::voxel::offsetPosition(target->block,target->normal);require(cell.has_value(),"Invalid mod block placement cell");
+            button(window,SDL_BUTTON_RIGHT,true);step(await([](const auto& input){return input.place;}));button(window,SDL_BUTTON_RIGHT,false);frame();
+            require(world.block(*cell)==blocks.require("demo:glowstone")&&state.inventory.count(glowstone)==0,"Mod block placement did not consume the crafted item");
+            require(mods.save()[0].state.at("placed")=="1","Mod place hook did not persist its counter");
+            if(argc>6) require(step(window.poll(),vc::utf8Path(argv[6])),"Mod block texture screenshot failed");
+            select(3);const auto life=state.inventory.selected().durability;
+            button(window,SDL_BUTTON_LEFT,true);step(await([](const auto& input){return input.destroyHeld;}));frames(12);
+            button(window,SDL_BUTTON_LEFT,false);frame();
+            require(world.block(*cell)==vc::voxel::air&&state.inventory.count(glowstone)==1,"Declared mod mining rule did not return its block");
+            require(state.inventory.selected().durability==life-1,"Mod mining did not wear the selected pickaxe");
+            vc::PlayerSaveState saved;saved.mods=mods.save();
+            auto reloadedBlocks=vc::builtinBlocks();vc::ModRuntime reloaded(vc::utf8Path(argv[4]),reloadedBlocks);
+            reloaded.restore(vc::decodePlayer(vc::encodePlayer(saved)).mods);
+            require(reloaded.save()[0].state.at("placed")=="1","Mod place counter was lost on reload");
+            vc::log("Modded survival verified: SDL paged crafting, consumption, placement hook and saved state");
+        }
         renderer.shutdown();const auto validation=renderer.validationReport();require(validation.enabled&&!validation.errors&&!validation.warnings,"Survival playtest reported Vulkan diagnostics");
         vc::log("Survival playtest passed: held mining, wood/stone crafting progression, iron harvest, tool wear, backpack transfers, save/reload, fall death and R respawn; zero Vulkan diagnostics");
         return 0;

@@ -95,6 +95,18 @@ TEST(Input, InventoryPointerModeDoesNotCaptureOrEdit) {
     state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_ESCAPE));EXPECT_TRUE(state.consume().closeUi);
     state.setPointerMode(false);state.setCaptured(true);EXPECT_EQ(state.consume().forward,0);
 }
+TEST(Input, MenuClicksKeepButtonPositionWhenLaterMotionArrives) {
+    for(const auto which:{SDL_BUTTON_LEFT,SDL_BUTTON_RIGHT}) {
+        vc::InputState state;state.setPointerMode(true);
+        auto click=button(SDL_EVENT_MOUSE_BUTTON_DOWN,static_cast<Uint8>(which));click.button.x=12;click.button.y=34;
+        state.process(click);
+        SDL_Event motion{};motion.type=SDL_EVENT_MOUSE_MOTION;motion.motion.x=200;motion.motion.y=300;state.process(motion);
+        const auto input=state.consume();
+        EXPECT_TRUE(which==SDL_BUTTON_LEFT?input.primaryClick:input.secondaryClick);
+        EXPECT_EQ(input.cursorX,12);EXPECT_EQ(input.cursorY,34);
+        const auto next=state.consume();EXPECT_EQ(next.cursorX,200);EXPECT_EQ(next.cursorY,300);
+    }
+}
 TEST(Input, FractionalAndFlippedWheelAndFocusCancellation) {
     vc::InputState state;state.setCaptured(true);SDL_Event event{};event.type=SDL_EVENT_MOUSE_WHEEL;event.wheel.y=0.5f;
     state.process(event);EXPECT_EQ(state.consume().scroll,0);state.process(event);EXPECT_EQ(state.consume().scroll,1);

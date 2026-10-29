@@ -90,4 +90,14 @@ float Lighting::sky(Position cell) const {
 float Lighting::block(Position cell) const {
     const auto found=blocks_.find(chunkPosition(cell));return found==blocks_.end()?0:static_cast<float>(found->second.levels[blockIndex(localPosition(cell))])/15;
 }
+Lighting Lighting::snapshotForMesh(Position chunk) const {
+    (void)chunkOrigin(chunk);Lighting snapshot;
+    const auto copy=[&](Position p) {
+        if(const auto light=blocks_.find(p);light!=blocks_.end()) snapshot.blocks_.insert(*light);
+        if(const auto column=sky_.find({p.x,0,p.z});column!=sky_.end()) snapshot.sky_.insert(*column);
+    };
+    copy(chunk);
+    for(const auto direction:directions) if(const auto adjacent=offsetPosition(chunk,direction)) copy(*adjacent);
+    return snapshot;
+}
 }

@@ -6,6 +6,31 @@
 #include <utility>
 
 namespace vc {
+void validateSavedItem(const SavedItemStack& item) {
+    if(item.identifier.empty()) {
+        if(item.count||item.durability) throw std::runtime_error("Empty saved item carries a quantity");
+    } else if(item.identifier.size()>256||!voxel::BlockRegistry::validIdentifier(item.identifier)||!item.count||item.count>64)
+        throw std::runtime_error("Invalid saved item stack");
+}
+InventoryActionResult applyInventoryAction(SurvivalInventory& inventory,const InventoryAction& action,
+        const ItemRegistry& items,const std::vector<Recipe>& recipes) {
+    bool changed=false;
+    switch(action.kind) {
+    case InventoryActionKind::Swap: changed=inventory.swap(action.from,action.to);break;
+    case InventoryActionKind::TransferOne: changed=inventory.transfer(action.from,action.to,1,items);break;
+    case InventoryActionKind::MoveToBackpack: changed=inventory.moveToBackpack(action.from,items);break;
+    case InventoryActionKind::Craft:
+        if(action.recipe>=recipes.size()) throw std::invalid_argument("Unknown crafting recipe");
+        switch(inventory.craft(recipes[action.recipe],items)) {
+        case CraftResult::Crafted:return InventoryActionResult::Changed;
+        case CraftResult::MissingIngredients:return InventoryActionResult::MissingIngredients;
+        case CraftResult::NoSpace:return InventoryActionResult::NoSpace;
+        }
+        break;
+    default: throw std::invalid_argument("Unknown inventory action");
+    }
+    return changed?InventoryActionResult::Changed:InventoryActionResult::NoChange;
+}
 ItemId ItemRegistry::add(ItemDefinition definition) {
     if(!voxel::BlockRegistry::validIdentifier(definition.identifier)||definition.identifier.size()>256)
         throw std::invalid_argument("Invalid item identifier: "+definition.identifier);

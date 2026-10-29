@@ -1,5 +1,6 @@
 #include "game/simulation/creatures.hpp"
 #include "game/player/save_state.hpp"
+#include "tests/player_fixture.hpp"
 #include "game/content/blocks.hpp"
 #include <gtest/gtest.h>
 #include <limits>
@@ -90,8 +91,7 @@ TEST(Creatures, SaveStableIdentityMigrationMissingLootAndTransactionalRestore) {
     EXPECT_THROW(restored.restore(invalid,items),std::runtime_error);EXPECT_EQ(restored.save(items).size(),2u);
     invalid=missing;invalid[0].velocity.x=std::numeric_limits<double>::infinity();EXPECT_THROW(restored.restore(invalid,items),std::runtime_error);
     invalid=missing;invalid[0].kind="unknown:type";EXPECT_THROW(restored.restore(invalid,items),std::runtime_error);
-    // Remove the v5 zero-actor count to construct a genuine v4 payload.
-    vc::PlayerSaveState old;auto versionFour=vc::encodePlayer(old);versionFour[8]=4;versionFour.resize(versionFour.size()-4);
+    const auto versionFour=vc::test::legacyPlayer(4);
     EXPECT_TRUE(vc::decodePlayer(versionFour).actors.empty());
 }
 TEST(Creatures, BoundedPopulationAndDaytimeSafety) {
@@ -102,4 +102,34 @@ TEST(Creatures, BoundedPopulationAndDaytimeSafety) {
     for(int i=0;i<31;++i) EXPECT_TRUE(living.spawn(vc::CreatureKind::Grazer,{10,1.001,10}));
     EXPECT_FALSE(living.spawn(vc::CreatureKind::Grazer,{}));EXPECT_EQ(living.creatureCount(),32u);
     EXPECT_THROW(living.update(-1,world,blocks,{},nullptr,items,false),std::invalid_argument);
+}
+TEST(Creatures, MultiplePlayersRetainDistantCreaturesAndReceiveIndependentCombat) {
+    const auto blocks=vc::builtinBlocks();const auto items=vc::builtinItems(blocks);auto world=floorWorld(blocks);
+    for(int x=15;x<=17;++x) for(int z=-1;z<=1;++z) {
+        vc::voxel::Chunk chunk({x,0,z});
+        for(int a=0;a<32;++a) for(int b=0;b<32;++b) chunk.set({a,0,b},blocks.require("voxelcraft:stone"));
+        world.insert(std::move(chunk));
+    }
+    vc::LivingWorld living(42);const auto near=living.spawn(vc::CreatureKind::Grazer,{1,1.001,1});
+    const auto far=living.spawn(vc::CreatureKind::Grazer,{513,1.001,1});ASSERT_TRUE(near&&far);
+    const std::array players{vc::LivingPlayer{{0.5,2.62,0.5},nullptr},vc::LivingPlayer{{512.5,2.62,0.5},nullptr}};
+    for(int i=0;i<60;++i) living.update(1.0/60,world,blocks,players,items,false,false);
+    EXPECT_EQ(living.creatureCount(),2u);
+    const auto position=living.save(items)[0].position+glm::dvec3(0,0.75,0);
+    EXPECT_TRUE(living.attack(*near,position,nullptr,items,1).hit);
+    EXPECT_FALSE(living.attack(*near,position,nullptr,items,1).hit);
+    EXPECT_TRUE(living.attack(*near,position,nullptr,items,2).hit);
+    living.update(0.1,world,blocks,std::span<const vc::LivingPlayer>{},items,false,false);EXPECT_EQ(living.creatureCount(),2u);
+}
+TEST(Creatures, MultiplayerLootCanPassFullInventoryAndStalkersTargetSurvivalPlayers) {
+    const auto blocks=vc::builtinBlocks();const auto items=vc::builtinItems(blocks);const auto world=floorWorld(blocks);
+    vc::SurvivalState full,recipient;ASSERT_TRUE(full.inventory.add(items.require("voxelcraft:dirt"),36*64,items));
+    vc::LivingWorld living(1);ASSERT_TRUE(living.drop({0.5,1.001,0.5},{items.require("voxelcraft:coal"),1,0},items));
+    const std::array players{vc::LivingPlayer{{0.5,2.62,0.5},&full},vc::LivingPlayer{{0.5,2.62,0.6},&recipient}};
+    const auto events=living.update(0.1,world,blocks,players,items,false,false);EXPECT_EQ(events.collected,1u);EXPECT_EQ(living.dropCount(),0u);
+    EXPECT_EQ(recipient.inventory.count(items.require("voxelcraft:coal")),1u);EXPECT_EQ(full.inventory.count(items.require("voxelcraft:coal")),0u);
+    ASSERT_TRUE(living.spawn(vc::CreatureKind::Stalker,{0.5,1.001,0.5}));
+    const std::array targets{vc::LivingPlayer{{0.5,2.62,0.6},nullptr},vc::LivingPlayer{{0.5,2.62,1.0},&recipient}};
+    for(int i=0;i<60;++i) living.update(1.0/60,world,blocks,targets,items,true,false);
+    EXPECT_LT(recipient.health(),20u);
 }

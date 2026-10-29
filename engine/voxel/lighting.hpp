@@ -10,6 +10,9 @@ public:
     std::vector<Position> refresh(const World& world,const BlockRegistry& registry,std::span<const Position> changed);
     float sky(Position cell) const;
     float block(Position cell) const;
+    // Immutable face-neighborhood data for one mesh job. Does not copy emitters
+    // or unrelated resident lighting, and is safe to read on a worker.
+    Lighting snapshotForMesh(Position chunk) const;
 private:
     struct SkyCell { std::int64_t top{};bool present{};bool operator==(const SkyCell&) const=default; };
     using SkyColumn=std::array<SkyCell,chunkSize*chunkSize>;
