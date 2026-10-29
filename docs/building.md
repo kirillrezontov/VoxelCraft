@@ -64,9 +64,22 @@ ctest --preset server
 ./build/server/bin/voxelcraft-server --no-save --ticks 90
 ```
 
-For sanitizers, configure Clang with `-DCMAKE_CXX_FLAGS="-fsanitize=address,undefined
--fno-omit-frame-pointer"` and `-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined`.
-LeakSanitizer may require running outside a restricted process sandbox.
+For isolated CPU sanitizers use separate build trees:
+
+```sh
+cmake --preset asan-ubsan
+cmake --build --preset asan-ubsan --parallel 4
+ctest --preset asan-ubsan
+cmake --preset tsan
+cmake --build --preset tsan --parallel 4
+ctest --preset tsan
+```
+
+`VC_SANITIZER=address-undefined` instruments ASan/UBSan; `thread` instruments TSan.
+The TSan test preset selects terrain/mesh/snapshot ownership and shutdown tests.
+The options cannot combine incompatible runtimes. Presets select Clang and omit
+SDL/Vulkan. A runner must permit the sanitizer's address-space layout and leak
+inspection; failure to initialize a runtime is a verification blocker, not a pass.
 
 When Python 3 is available, CTest also exercises the real server process and,
 in the graphics suite, two actual client executables. Python is optional and is
@@ -95,8 +108,10 @@ uses LunarG SDK 1.3.296.0 and its documented Qt unattended installer command wit
 
 Installed shared dependencies on Windows have their CMake-declared runtime DLLs
 copied beside the executable. Fetched SDL is static. Driver-provided Vulkan
-runtime and MSVC runtime availability remain runtime prerequisites. Distributable
-release packaging is not part of v0.1.
+runtime remains a driver prerequisite. CPack includes CMake-detected runtime DLLs
+and MSVC redistributable libraries. `/utf-8` plus an embedded UTF-8 process manifest
+preserves Unicode command-line paths on Windows 10 1903+. Local Linux results do
+not establish Windows build/runtime success.
 
 ## Assets and graphics testing
 
@@ -154,3 +169,60 @@ fixed restore by also requesting SDL window activation, and all eight strict
 tests now pass on the isolated Wayland display. Activation remains subject to
 desktop policy; the game continues to use the same Vulkan renderer. See the
 [continuation verification](development-session-2026-10-29.md).
+
+
+## v0.8.1 release archives
+
+Target CMake 3.25+, GCC 13+/Clang 18+ with a C++23 standard library, or Visual
+Studio 2022 MSVC x64. Locally exercised versions are GCC 16.2.1 and Clang 22.1.8;
+MSVC and CI's older Linux toolchains remain acceptance checks until CI executes.
+Debug, Release and RelWithDebInfo presets share the same target graph. No Vulkan
+or SDL dependency is discovered when `VC_BUILD_CLIENT=OFF`.
+
+```sh
+cmake --preset release -DVC_BUILD_SOAK_TOOLS=ON
+cmake --build --preset release --parallel 4
+ctest --preset release
+cpack --config build/release/CPackConfig.cmake -C Release
+python3 tests/package_smoke.py build/release/packages/*.tar.gz
+# On a graphics host, also check the extracted client:
+python3 tests/package_smoke.py build/release/packages/*.tar.gz --gpu
+```
+
+MSVC uses `cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64`,
+`cmake --build build/windows --config Release --parallel 4`,
+`ctest --test-dir build/windows -C Release --output-on-failure`, then
+`cpack --config build/windows/CPackConfig.cmake -C Release`.
+Pass the two generated ZIP paths to `python tests/package_smoke.py`.
+CI builds and checks both component archives without requesting a graphics device.
+The optional manually dispatched Vulkan workflow requires a maintained runner
+labeled `self-hosted`, `linux`, `vulkan` with a display and validation layer.
+
+Archives live in `build/<preset>/packages/` and contain exactly one executable,
+required detected redistributables, notices, launch instructions, documentation,
+and optional demo assets. Client shaders are compiled and installed automatically.
+Core textures/content live in the executable. Client and server both work outside
+the source working directory; the package test also exercises Unicode world paths.
+No compiler, SDK, build caches, GoogleTest, object files or development libraries
+are packaged. C++ runtime libraries are bundled on Linux; glibc, desktop libraries
+and the Vulkan driver/loader remain OS prerequisites. Linux compatibility is
+bounded by the build host's glibc; CI's Ubuntu 24.04 packages should be verified
+on that baseline before distribution. System-dependency builds must supply their
+matching license notices; the release configuration uses pinned sources.
+
+A fresh checkout needs network access to upstream pinned sources. Offline builds
+can explicitly reuse existing source checkouts via CMake's
+`FETCHCONTENT_SOURCE_DIR_GLM`, `_ENTT`, `_NLOHMANN_JSON`, `_LUA`, `_STB_IMAGE`,
+`_SDL3`, and `_GOOGLETEST` cache variables. Each points to its source directory,
+not another build tree. This preserves independent compiler/configuration outputs.
+Do not silently substitute unpinned installed libraries. The stabilization session
+used these overrides after a fresh GitHub clone stalled; see its report.
+
+`vc_mesh_benchmark` prints paired reference/greedy counts and CPU times for a fixed
+seed and 150 chunks, then compares synchronous and owned background scheduling.
+It excludes generation, lighting and GPU time and includes 1 ms polling sleeps in
+background wall time. Normal client title/log diagnostics expose frame/FPS,
+update/draw/upload CPU times (draw includes fence/present waits), draw calls,
+triangles, loaded/visible chunks, pending jobs, generation/mesh timings, cached edit
+bytes, save duration and connected network byte counters. Logging is periodic,
+not per-frame. No GPU timer-query measurements are claimed.

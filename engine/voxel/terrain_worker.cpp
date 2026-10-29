@@ -28,6 +28,7 @@ std::optional<Chunk> TerrainWorker::takeReady() {
     return chunk;
 }
 std::size_t TerrainWorker::pendingCount() const { std::lock_guard lock(mutex_); return pending_.size(); }
+WorkMetrics TerrainWorker::metrics() const { std::lock_guard lock(mutex_);return metrics_; }
 void TerrainWorker::run(std::stop_token stop) {
     try {
         while (!stop.stop_requested()) {
@@ -37,10 +38,11 @@ void TerrainWorker::run(std::stop_token stop) {
                 if (!wake_.wait(lock, stop, [this] { return !requests_.empty(); })) return;
                 position = requests_.front(); requests_.pop_front();
             }
+            const auto started=std::chrono::steady_clock::now();
             auto chunk = generator_.generate(position);
             if (stop.stop_requested()) return;
             std::lock_guard lock(mutex_);
-            ready_.push_back(std::move(chunk));
+            ready_.push_back(std::move(chunk));metrics_.record(started);
         }
     } catch (...) {
         std::lock_guard lock(mutex_); failure_ = std::current_exception();

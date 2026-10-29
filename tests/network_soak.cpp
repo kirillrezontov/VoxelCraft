@@ -48,12 +48,13 @@ int main(int argc,char** argv) {
         }
         vc::test::TempDirectory temp;prepare(temp.path());vc::server::HostConfig config;
         config.worldDirectory=temp.path();config.port=0;config.radius=1;config.populate=false;
+        for(std::size_t i=0;i<8;++i) config.profileTokens.emplace("soak_"+std::to_string(i),std::string(64,static_cast<char>('0'+i)));
         std::uint64_t commands=0,placed=0,removed=0,churn=0,steps=0;std::size_t peakChunks=0;
         std::vector<vc::PlayerProfile> expected;
         {
             vc::server::Host host(config);std::array<Bot,8> bots;
             const auto connect=[&](std::size_t index) {
-                auto& bot=bots[index];bot.client=std::make_unique<vc::netgame::RemoteSession>("127.0.0.1",host.port(),"Soak_"+std::to_string(index),host.fingerprint(),bot.blocks);
+                auto& bot=bots[index];bot.client=std::make_unique<vc::netgame::RemoteSession>("127.0.0.1",host.port(),"Soak_"+std::to_string(index),host.fingerprint(),bot.blocks,config.profileTokens.at("soak_"+std::to_string(index)));
                 bot.lastTick=0;bot.missingTerrain=0;
             };
             for(std::size_t i=0;i<bots.size();++i) connect(i);

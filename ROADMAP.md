@@ -1,6 +1,27 @@
 # VoxelCraft Development Roadmap
 
-## Current Milestone: v0.8 — Multiplayer (development)
+## Current Milestone: v0.8.1 — Stabilization (release candidate)
+
+- [x] Baseline audit and complete CPU/CLI regression run
+- [x] Profile-specific private-server credentials; explicit trusted-LAN mode
+- [x] Protocol 3 diagnostics, idle cleanup, bounded client residency and shutdown notification
+- [x] Durable region/manifest writes and atomic directory publication
+- [x] Owned, bounded asynchronous terrain/meshing/snapshot work
+- [x] Opaque greedy meshing, tiled UVs and surface-equivalence regressions
+- [x] Worker/render/save/network diagnostics and reproducible mesh benchmark
+- [x] Single-frame fence replacement of terrain/HUD GPU buffers
+- [x] Window size, fullscreen and VSync startup settings
+- [x] ASan/UBSan and isolated TSan presets; bounded network stress tooling
+- [x] CPack client/server archives, dependency notices and extracted-archive tests
+- [x] Linux/Windows CI packaging plus optional hardware Vulkan workflow
+- [ ] Windows MSVC build/CPU tests/archive checks actually executed on Windows
+- [ ] Windows gameplay and cross-platform human LAN acceptance
+- [ ] Remote CI results and public distribution license selection
+
+Detailed task coverage, measurements, commands and remaining blockers are tracked
+in [docs/v0.8.1-stabilization.md](docs/v0.8.1-stabilization.md). Release-candidate
+implementation does not constitute final Windows or human playtest acceptance.
+
 
 The persistent creative sandbox is implemented, and the optional survival slice
 now provides a real resource/tool progression. These are development checkpoints;
@@ -77,15 +98,17 @@ sustained human playtesting and Windows execution remain pending.
 - [x] F5/autosave/console-interrupt snapshots and reconnect persistence
 - [x] Two real loopback players and strict SDL/Vulkan shared custom-block playtest
 - [x] Server-authoritative survival mining/crafting/health/private inventories and respawn
-- [ ] Client prediction, latency/bandwidth tuning and network soak tests
-- [ ] Authenticated identity, encryption, internet hosting and server administration
+- [x] Bounded eight-client connection/edit/save/restart soak tooling
+- [ ] Client prediction and extended latency/bandwidth tuning
+- [x] Per-profile private-server credentials (v0.8.1)
+- [ ] Encryption, internet hosting and server administration
 - [ ] Windows execution and sustained human LAN playtesting
 
 ### Next development step
 
-Verify connected survival and improve latency/bandwidth while preserving local
-play. See the [timed session record](docs/development-session-five-hour-2026-10-29.md)
-for executed checks and the fixed stopping time.
+Execute the Windows/MSVC workflow and manual cross-platform acceptance matrix.
+Resolve the release blockers in [the stabilization record](docs/v0.8.1-stabilization.md)
+before marking v0.8.1 stable.
 
 ## v0.3 — Persistent Sandbox (implemented development foundation)
 
@@ -117,8 +140,8 @@ neither v0.2 nor v0.3 is claimed as a stabilized release.
 
 See the
 [session record](docs/development-session-2026-10-28.md) for executed checks and the
-latest stopping point. Modified chunks persist across streaming; background
-meshing and save I/O remain planned.
+latest stopping point. Modified chunks persist across streaming; bounded background
+meshing and snapshot I/O are implemented in v0.8.1.
 
 The v0.1 implementation is complete under SPEC §35: the Linux application is
 buildable, tested and hardware-validated, with Windows CMake/CI preparation done.

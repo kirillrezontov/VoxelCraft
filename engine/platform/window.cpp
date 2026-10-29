@@ -9,10 +9,11 @@ namespace vc {
 namespace {
 void check(bool result) { if (!result) throw std::runtime_error(SDL_GetError()); }
 }
-Window::Window() {
+Window::Window(int width,int height,bool fullscreen) {
+    if(width<320||height<240||width>16384||height>16384) throw std::invalid_argument("Invalid window size");
     check(SDL_Init(SDL_INIT_VIDEO));
-    window_ = SDL_CreateWindow("VoxelCraft " VC_VERSION_STRING, 1280, 720,
-        SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    window_ = SDL_CreateWindow("VoxelCraft " VC_VERSION_STRING, width, height,
+        SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | (fullscreen?SDL_WINDOW_FULLSCREEN:0));
     if (!window_) { const std::string error = SDL_GetError(); SDL_Quit(); throw std::runtime_error(error); }
 }
 Window::~Window() { SDL_DestroyWindow(window_); SDL_Quit(); }

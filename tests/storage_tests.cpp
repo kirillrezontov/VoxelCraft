@@ -140,3 +140,20 @@ TEST(Storage, UnicodeWorldPathsUseUtf8AtTextBoundaries) {
     store.save(world,registry,{});const auto loaded=store.load(registry);ASSERT_TRUE(loaded);
     EXPECT_EQ(loaded->world.block({-1,0,0}),registry.require("voxelcraft:stone"));
 }
+
+TEST(Storage, ExplicitRecoveryUsesPreviousRevisionWithoutRewritingCorruptData) {
+    using namespace vc::voxel;
+    vc::test::TempDirectory temp;auto registry=vc::builtinBlocks();
+    {
+        WorldStore store(temp.path());World world;world.insert(Chunk({-1,0,0}));
+        world.setBlock({-1,0,0},registry.require("voxelcraft:stone"));store.save(world,registry,{},"previous");
+        world.setBlock({-1,0,0},registry.require("voxelcraft:dirt"));store.save(world,registry,{},"latest");
+        std::ofstream(temp.path()/"snapshots/2/r.-1.0.0.vcr",std::ios::app).put('x');
+        EXPECT_THROW(store.load(registry),std::runtime_error);
+    }
+    // The documented operator recovery preserves the corrupt revision for diagnosis.
+    std::filesystem::rename(temp.path()/"snapshots/2",temp.path()/"corrupt-2");
+    WorldStore reopened(temp.path());const auto archive=reopened.load(registry);ASSERT_TRUE(archive);
+    EXPECT_EQ(archive->gameData,"previous");EXPECT_EQ(archive->world.block({-1,0,0}),registry.require("voxelcraft:stone"));
+    EXPECT_TRUE(std::filesystem::exists(temp.path()/"corrupt-2/world.vcw"));
+}

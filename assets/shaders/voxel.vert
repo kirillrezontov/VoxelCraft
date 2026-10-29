@@ -10,6 +10,8 @@ layout(location = 7) in vec3 instanceOffset;
 layout(location = 8) in float instanceYaw;
 layout(location = 9) in vec2 instanceLight;
 layout(location = 10) in float instancePhase;
+layout(location = 11) in vec4 tileBounds;
+layout(location = 7) flat out vec4 atlasTile;
 layout(location = 0) out vec3 vertexColor;
 layout(location = 1) out vec2 textureUv;
 layout(location = 2) flat out float untextured;
@@ -24,7 +26,7 @@ void main() {
     vec3 relative=rotation*(position+sway*sin(instancePhase))+instanceOffset+camera.offset.xyz;
     gl_Position = camera.viewProjection * vec4(relative,1);
     vertexColor = color;
-    textureUv = uv;
+    textureUv = uv;atlasTile=tileBounds;
     untextured = camera.offset.w;
     surfaceNormal=rotation*normal;illumination=vec2(light.x*instanceLight.x,max(light.y,instanceLight.y));vertexOpacity=opacity;
     viewDistance=camera.fog.z>0.5?length(relative.xz):length(relative);

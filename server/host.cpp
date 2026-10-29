@@ -64,6 +64,12 @@ struct Host::Impl {
 
     explicit Impl(HostConfig settings):config(std::move(settings)) {
         if(config.radius<1||config.radius>6) throw std::invalid_argument("Server radius must be 1..6 chunks");
+        if(config.profileTokens.empty()&&!config.trustedLan&&config.bindAddress!="127.0.0.1"&&config.bindAddress!="::1")
+            throw std::invalid_argument("Non-loopback hosting requires --auth-file or explicit --trusted-lan (trusted private networks only)");
+        for(const auto& [name,token]:config.profileTokens)
+            if(!validPlayerName(name)||name!=playerNameKey(name)||!netgame::validIdentityToken(token))
+                throw std::invalid_argument("Invalid configured profile identity");
+        if(config.profileTokens.size()>maxSavedProfiles) throw std::invalid_argument("Too many configured profile identities");
         mods=std::make_unique<ModRuntime>(config.modsDirectory,blocks);installContent();
         fingerprint=netgame::contentFingerprint(blocks,items,recipes,*mining,*mods);
         metadata.seed=config.seed.value_or(12345);metadata.bounds={config.minY.value_or(-512),config.maxY.value_or(511)};
@@ -154,6 +160,13 @@ struct Host::Impl {
         for(const auto& other:connections) if(&other!=&connection&&other.id&&other.channel.open()&&other.profile&&playerNameKey(other.profile->name)==key) {
             reject(connection,"That player name is already connected");return;
         }
+        if(!config.profileTokens.empty()) {
+            const auto credential=config.profileTokens.find(key);
+            if(credential==config.profileTokens.end()||!netgame::equalIdentityToken(credential->second,hello.identityToken)) {
+                reject(connection,"Player identity rejected");return;
+            }
+        }
+        connection.hello->identityToken.clear();
         const auto occupied=bodies(&connection);auto found=savedProfiles.find(key);
         if(found==savedProfiles.end()) {
             if(savedProfiles.size()>=maxSavedProfiles) { reject(connection,"Server saved-profile limit reached");return; }
@@ -235,10 +248,13 @@ struct Host::Impl {
                     --connection.credit;handle(connection,*message);if(connection.closing||!connection.channel.open()) break;
                 }
                 if(warmed&&!connection.id&&!connection.closing&&connection.hello) join(connection);
+                if(connection.id&&connection.idle>30&&!connection.closing) reject(connection,"Player input timed out");
                 if(warmed&&!connection.id&&connection.age>10&&!connection.closing) reject(connection,"Join handshake timed out");
                 if(connection.closing) { connection.closingTime+=seconds;if(!connection.channel.queuedBytes()||connection.closingTime>1) connection.channel.close(); }
             } catch(const std::exception& error) {
-                log(std::string("Rejected peer: ")+error.what());connection.channel.close();
+                log(std::string("Rejected peer: ")+error.what());
+                if(connection.id||connection.closing||!connection.channel.open()) connection.channel.close();
+                else try { reject(connection,error.what()); } catch(...) { connection.channel.close(); }
             }
             if(!connection.channel.open()) {
                 remember(connection);if(connection.id&&connection.profile) { log("Player left: "+connection.profile->name);broadcast(connection.profile->name+" left"); }
@@ -383,7 +399,7 @@ struct Host::Impl {
     }
     void completed(const voxel::SnapshotResult& result) {
         result.rethrowIfFailed();lastSave=elapsed;
-        log("Server saved world revision "+std::to_string(result.revision)+" to "+pathText(store->directory()));
+        log("Server saved world revision "+std::to_string(result.revision)+" in "+std::to_string(result.milliseconds)+" ms to "+pathText(store->directory()));
     }
     void pollSave() {
         if(!writer) return;
@@ -425,6 +441,16 @@ struct Host::Impl {
 };
 Host::Host(HostConfig config):impl_(std::make_unique<Impl>(std::move(config))) {}
 Host::~Host()=default;
+void Host::shutdown() {
+    // One bounded nonblocking flush. A slow peer cannot hold up a saved shutdown.
+    for(auto& connection:impl_->connections) if(connection.id&&connection.channel.open()) {
+        try {
+            impl_->text(connection,netgame::Message::Goodbye,"Server shutting down");
+            connection.channel.pump();
+        } catch(...) {}
+        connection.channel.close();
+    }
+}
 void Host::tick(double seconds) { impl_->tick(seconds); }
 std::uint64_t Host::save() { return impl_->save(); }
 bool Host::ready() const { return impl_->warmed; }

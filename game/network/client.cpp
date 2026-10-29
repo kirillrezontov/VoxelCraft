@@ -16,16 +16,17 @@ struct RemoteSession::Impl {
     std::map<voxel::Position,std::uint64_t> revisions;
     std::vector<std::string> notices;
     std::uint64_t sequence{};
-    std::chrono::steady_clock::time_point started=std::chrono::steady_clock::now();
-    Impl(std::string host,std::uint16_t port,std::string player,std::uint64_t fingerprint,voxel::BlockRegistry& registry)
+    std::chrono::steady_clock::time_point started=std::chrono::steady_clock::now(),lastReceived=started;
+    Impl(std::string host,std::uint16_t port,std::string player,std::uint64_t fingerprint,voxel::BlockRegistry& registry,std::string identityToken)
         :blocks(registry),channel(net::TcpStream::connect(host,port)),name(std::move(player)) {
-        if(!channel.queue(encode(Hello{fingerprint,name}))) throw std::runtime_error("Cannot queue multiplayer handshake");
+        if(!channel.queue(encode(Hello{fingerprint,name,std::move(identityToken)}))) throw std::runtime_error("Cannot queue multiplayer handshake");
     }
     void queue(const binary::Bytes& message) {
         if(!joined||!channel.open()) throw std::runtime_error("Multiplayer session is not connected");
         if(!channel.queue(message)) throw std::runtime_error("Client command queue exceeded");
     }
     void receive(const binary::Bytes& message) {
+        lastReceived=std::chrono::steady_clock::now();
         const auto type=messageType(message);
         if(type==Message::Reject) throw std::runtime_error("Server rejected connection: "+decodeText(message,type));
         if(type==Message::Welcome) {
@@ -43,6 +44,7 @@ struct RemoteSession::Impl {
         switch(type) {
         case Message::Chunk: {
             auto update=decodeChunk(message,mapping);const auto p=update.chunk.position();const auto known=revisions.find(p);
+            if(known==revisions.end()&&revisions.size()>=2048) throw std::runtime_error("Server exceeded client chunk residency limit");
             if(known==revisions.end()||known->second<update.revision) { world.insert(std::move(update.chunk));revisions[p]=update.revision; }
             break;
         }
@@ -53,6 +55,9 @@ struct RemoteSession::Impl {
             bool own=false;for(const auto& peer:state.players) if(peer.id==joined->id) own=true;
             if(!own) throw std::runtime_error("Server state omitted the connected player");
             latest=std::move(state);break;
+        }
+        case Message::Goodbye: {
+            const auto reason=decodeText(message,type);channel.close();throw std::runtime_error("Server disconnected: "+reason);
         }
         case Message::Notice:
             if(notices.size()<64) notices.push_back(decodeText(message,type));else (void)decodeText(message,type);
@@ -69,10 +74,13 @@ struct RemoteSession::Impl {
         channel.pump();while(auto message=channel.take()) receive(*message);
         if(!joined&&channel.open()&&std::chrono::steady_clock::now()-started>std::chrono::seconds(30))
             throw std::runtime_error("Server welcome timed out");
+        if(joined&&channel.open()&&std::chrono::steady_clock::now()-lastReceived>std::chrono::seconds(15)) {
+            channel.close();throw std::runtime_error("Server stopped responding for 15 seconds");
+        }
     }
 };
-RemoteSession::RemoteSession(std::string host,std::uint16_t port,std::string name,std::uint64_t fingerprint,voxel::BlockRegistry& blocks)
-    :impl_(std::make_unique<Impl>(std::move(host),port,std::move(name),fingerprint,blocks)) {}
+RemoteSession::RemoteSession(std::string host,std::uint16_t port,std::string name,std::uint64_t fingerprint,voxel::BlockRegistry& blocks,std::string identityToken)
+    :impl_(std::make_unique<Impl>(std::move(host),port,std::move(name),fingerprint,blocks,std::move(identityToken))) {}
 RemoteSession::~RemoteSession()=default;
 void RemoteSession::pump() { impl_->pump(); }
 void RemoteSession::input(Input intent) { intent.sequence=++impl_->sequence;impl_->queue(encode(intent)); }
@@ -83,6 +91,8 @@ void RemoteSession::disconnect() noexcept {
     try { if(impl_->channel.open()&&impl_->joined) { (void)impl_->channel.queue(encodeControl(Message::Goodbye));impl_->channel.pump(); } } catch(...) {}
     impl_->channel.close();
 }
+std::uint64_t RemoteSession::sentBytes() const { return impl_->channel.sentBytes(); }
+std::uint64_t RemoteSession::receivedBytes() const { return impl_->channel.receivedBytes(); }
 bool RemoteSession::open() const { return impl_->channel.open(); }
 const Welcome* RemoteSession::welcome() const { return impl_->joined?&*impl_->joined:nullptr; }
 const State& RemoteSession::state() const { return impl_->latest; }

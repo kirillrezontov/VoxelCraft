@@ -1,4 +1,5 @@
 #pragma once
+#include "engine/core/work_metrics.hpp"
 #include "engine/voxel/mesher.hpp"
 #include "engine/voxel/lighting.hpp"
 #include <condition_variable>
@@ -21,6 +22,7 @@ public:
     bool request(const World& world,Position chunk,std::uint64_t ticket,const Lighting* lighting=nullptr);
     std::optional<CompletedMesh> takeReady();
     std::size_t pendingCount() const;
+    WorkMetrics metrics() const;
 private:
     struct Job { Position position;std::uint64_t ticket;World world;std::optional<Lighting> lighting; };
     void run(std::stop_token stop);
@@ -33,6 +35,7 @@ private:
     std::deque<CompletedMesh> ready_;
     std::set<Position> pending_;
     std::exception_ptr failure_;
+    WorkMetrics metrics_;
     std::jthread thread_; // Stops/joins before the queues and immutable content.
 };
 
@@ -41,6 +44,7 @@ private:
 class BackgroundMeshQueue {
 public:
     BackgroundMeshQueue(const BlockRegistry& registry,const AtlasLayout& atlas,std::size_t capacity=4);
+    WorkMetrics metrics() const { return worker_.metrics(); }
     void collect(World& world);
     void invalidate(std::span<const Position> chunks);
     std::vector<Mesh> update(const World& world,Position player,std::size_t budget=2,const Lighting* lighting=nullptr);

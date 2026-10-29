@@ -25,3 +25,9 @@ and saved mod state. Immediate follow-up: manual modded playtesting, API/state
 migration policy and Windows compilation when a runner is available. Later versions remain planned. See the original
 [v0.1 verification](verification.md) and current [v0.2 verification](verification-v02.md).
 The [timed session log](development-session-2026-10-28.md) records new work and checks.
+
+
+The v0.8 multiplayer foundation and v0.8.1 stabilization candidate are implemented.
+See the [stabilization record](v0.8.1-stabilization.md) for current test/benchmark
+results and release blockers; Windows and cross-platform human LAN acceptance
+remain pending.

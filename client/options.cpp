@@ -25,7 +25,13 @@ Options parseOptions(int argc, char** argv) {
             if (++i >= argc) throw std::invalid_argument("Missing value for " + std::string(flag));
             return argv[i];
         };
-        if (flag == "--seed") { options.seed = number<std::uint64_t>(value()); options.seedSpecified=true; }
+        if(flag=="--width") options.width=number<int>(value());
+        else if(flag=="--height") options.height=number<int>(value());
+        else if(flag=="--fullscreen") options.fullscreen=true;
+        else if(flag=="--windowed") options.fullscreen=false;
+        else if(flag=="--vsync") options.vsync=true;
+        else if(flag=="--no-vsync") options.vsync=false;
+        else if (flag == "--seed") { options.seed = number<std::uint64_t>(value()); options.seedSpecified=true; }
         else if (flag == "--radius") { options.radius = number<int>(value());options.radiusSpecified=true; }
         else if (flag == "--min-y") { options.bounds.minY = number<std::int64_t>(value());options.minSpecified=true; }
         else if (flag == "--max-y") { options.bounds.maxY = number<std::int64_t>(value());options.maxSpecified=true; }
@@ -35,6 +41,7 @@ Options parseOptions(int argc, char** argv) {
         }
         else if (flag == "--no-save") options.noSave=true;
         else if (flag == "--connect") { const auto address=net::parseEndpoint(value());options.connectHost=address.host;options.connectPort=address.port; }
+        else if (flag == "--identity-file") { options.identityFile=vc::utf8Path(value());if(options.identityFile.empty()) throw std::invalid_argument("--identity-file must not be empty"); }
         else if (flag == "--name") { options.playerName=value();options.nameSpecified=true; }
         else if (flag == "--mods-dir") {
             options.modsDirectory=vc::utf8Path(value());
@@ -69,6 +76,7 @@ Options parseOptions(int argc, char** argv) {
         else if (flag == "--help") options.help = true;
         else throw std::invalid_argument("Unknown option: " + std::string(flag));
     }
+    if(options.width<320||options.width>16384||options.height<240||options.height>16384) throw std::invalid_argument("Window size must be 320..16384 by 240..16384");
     if(options.smoke&&!options.generatorVersion) options.generatorVersion=2; // Stable interactive regression scene.
     if(options.minSpecified&&options.maxSpecified) options.bounds.validate();
     if (options.radius < 1 || options.radius > 6) throw std::invalid_argument("--radius must be between 1 and 6 chunks");
@@ -91,7 +99,7 @@ Options parseOptions(int argc, char** argv) {
             options.generatorVersion||options.timeOfDay||options.freezeTime||options.radiusSpecified)
             throw std::invalid_argument("Connected worlds use server world/seed/time/radius/save configuration");
         if(options.survival) throw std::invalid_argument("Connected worlds use the server game mode");
-    } else if(options.nameSpecified) throw std::invalid_argument("--name requires --connect");
+    } else if(options.nameSpecified||!options.identityFile.empty()) throw std::invalid_argument("--name and --identity-file require --connect");
     vc::GameSettings check;
     if(options.fieldOfView) check.fieldOfView=*options.fieldOfView;
     if(options.mouseSensitivity) check.mouseSensitivity=*options.mouseSensitivity;

@@ -10,7 +10,7 @@
 namespace vc {
 class Window {
 public:
-    Window();
+    Window(int width=1280,int height=720,bool fullscreen=false);
     ~Window();
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;

@@ -1,7 +1,16 @@
-# VoxelCraft — v0.8 development
+# VoxelCraft — v0.8.1 release candidate
 
 A C++23, SDL3 and Vulkan 1.3 voxel sandbox foundation. Windows is the primary release
 target; development and hardware rendering verification currently run on Linux.
+
+v0.8.1-rc1 adds private-server profile credentials, durable snapshot publication,
+bounded disconnect handling, asynchronous mesh/save workers, opaque greedy meshing,
+performance diagnostics, sanitizer presets and separate client/server archives.
+World formats and mod API 1 remain compatible. Network protocol 3 requires matching
+client/server versions. Windows and human LAN acceptance remain pending; this is
+not a stable release. See the [stabilization report](docs/v0.8.1-stabilization.md),
+[release notes](docs/v0.8.1-release-notes.md), and [test matrix](docs/release-v0.8.1-test-plan.md).
+
 
 Implemented: seeded procedural grass/dirt/stone terrain, compact 32³ chunks,
 neighbor-aware cube meshing, textured rendering with depth testing, a
@@ -263,10 +272,13 @@ Rendering culls terrain meshes outside the camera frustum and reports actual
 submitted draw counts. Initial generation uses one bounded CPU worker; window
 close/resize remain responsive during that phase. Rendering uses one frame in flight, staged atlas upload and direct host-visible mesh
 uploads. A near-first queue normally rebuilds at most two chunks per frame (four
-for an edit); removed GPU meshes are always cleared. Meshing and GPU replacement
-remain synchronous and can hitch. Mipmaps and background meshing are future
-work. Connected play currently smooths server positions without movement
-prediction. Snapshot saving is synchronous and can also hitch. Unavailable chunks
+for an edit); removed GPU meshes are always cleared. Generation and meshing use
+bounded workers with owned snapshots and revision tickets. Opaque full cubes merge
+compatible faces and repeat atlas tiles; transparent cubes retain unit faces.
+Mesh/HUD replacement waits for the single submitted frame fence. Mipmaps remain
+future work. Connected play smooths server positions without movement prediction.
+Snapshot serialization and disk synchronization run on one bounded worker; capture
+and full-world lighting still run on the main thread. Unavailable chunks
 temporarily block walking until the streaming worker fills them.
 The application supports cube blocks, including a separate transparent stream.
 Mod PNG textures append to the shared atlas; built-in tile indices remain fixed.
@@ -278,10 +290,42 @@ in `tests`, shaders in `assets/shaders`, and CI in `.github/workflows`.
 See [architecture](docs/architecture.md), [world format](docs/world-format.md),
 [modding design](docs/modding-design.md) and [ROADMAP](ROADMAP.md).
 
-Next: stabilize multiplayer, measure latency/bandwidth and continue roadmap work;
+Next: execute Windows/MSVC archive and cross-platform LAN acceptance, then continue roadmap work;
 explicit state migrations, harvest rules, PNG assets and a real server/client
 connection are implemented in the current timed continuation. Windows and manual playtests
 remain unverified. Project licensing has not been selected. The previous timed work
 record is [the session log](docs/development-session-2026-10-28.md); continuation
 work is recorded in [the handoff](docs/development-session-2026-10-29.md).
 The active five-hour window is tracked in [its session log](docs/development-session-five-hour-2026-10-29.md).
+
+
+## v0.8.1 packages and private hosting
+
+```sh
+cmake --preset release
+cmake --build --preset release --parallel 4
+ctest --preset release
+cpack --config build/release/CPackConfig.cmake -C Release
+python3 tests/package_smoke.py build/release/packages/*.tar.gz
+```
+
+Archives contain one executable each, compiled client shaders, bundled C++ runtime
+libraries/DLLs, dependency notices, launch documentation and the optional demo mod.
+Base textures and content are generated in the executable. Extract the entire
+archive; no compiler or Vulkan SDK is needed at runtime. Linux's glibc baseline
+matches the build host (CI targets Ubuntu 24.04). A Vulkan 1.3 driver remains
+required by the client. Run the extracted executable from any working directory.
+
+The default server bind remains loopback. For private network hosting use
+`--bind 0.0.0.0 --auth-file /private/identities.txt`; each line is `NAME TOKEN`,
+where TOKEN is a privately shared random 64-character lowercase hex value.
+Clients use `--connect HOST --name NAME --identity-file /private/player.token`.
+The client file contains only its token. See [hosting](docs/multiplayer.md) for
+creation, rotation and trust limits. Unauthenticated external binds require
+explicit `--trusted-lan`. TCP is unencrypted; use a trusted LAN or secured tunnel.
+
+Ordinary display configuration is available without source edits:
+`--width 1280 --height 720 --fullscreen` / `--windowed`, `--vsync` / `--no-vsync`,
+`--radius 1..6`, `--fov`, and `--sensitivity`. Audio is not implemented.
+The F10 settings menu persists FOV, sensitivity and invert-Y in the user directory;
+display/radius options are startup overrides. `--help` lists launch options.

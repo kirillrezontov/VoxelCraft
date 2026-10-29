@@ -9,6 +9,7 @@
 #include <array>
 #include <atomic>
 #include <cmath>
+#include <chrono>
 #include <cstddef>
 #include <cstring>
 #include <fstream>
@@ -87,7 +88,8 @@ struct VulkanRenderer::ValidationState {
 struct VulkanRenderer::Impl {
     Window& window;
     ValidationState& validation;
-    bool requireValidation{};
+    bool requireValidation{},vsync{true};
+    RenderMetrics metrics;
     VkInstance instance{};
     VkDebugUtilsMessengerEXT debug{};
     VkSurfaceKHR surface{};
@@ -350,12 +352,13 @@ struct VulkanRenderer::Impl {
         if(gpu.translucentCount) gpu.translucentIndices=createBuffer(mesh.translucentIndices.size()*sizeof(std::uint32_t),VK_BUFFER_USAGE_INDEX_BUFFER_BIT,mesh.translucentIndices.data());
         return gpu;
     }
-    void drawMesh(const GpuMesh& mesh,const PushConstants& push,bool translucent=false,std::uint32_t count=1,std::uint32_t first=0) const {
+    void drawMesh(const GpuMesh& mesh,const PushConstants& push,bool translucent=false,std::uint32_t count=1,std::uint32_t first=0) {
         vkCmdPushConstants(command, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT|VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(push), &push);
         const std::array<VkBuffer,2> buffers{mesh.vertices.handle,instanceBuffer.handle};
         constexpr std::array<VkDeviceSize,2> offsets{0,0};
         vkCmdBindVertexBuffers(command,0,static_cast<std::uint32_t>(buffers.size()),buffers.data(),offsets.data());
         vkCmdBindIndexBuffer(command,translucent?mesh.translucentIndices.handle:mesh.indices.handle,0,VK_INDEX_TYPE_UINT32);
+        ++metrics.drawCalls;
         vkCmdDrawIndexed(command,translucent?mesh.translucentCount:mesh.indexCount,count,0,0,first);
     }
     VkImageView createView(VkImage image, VkFormat format, VkImageAspectFlags aspect) const {
@@ -486,7 +489,15 @@ struct VulkanRenderer::Impl {
         if (graphicsFamily != presentFamily) {
             info.imageSharingMode = VK_SHARING_MODE_CONCURRENT; info.queueFamilyIndexCount = 2; info.pQueueFamilyIndices = families.data();
         }
-        info.preTransform = caps.currentTransform; info.compositeAlpha = alpha; info.presentMode = VK_PRESENT_MODE_FIFO_KHR; info.clipped = VK_TRUE;
+        info.preTransform = caps.currentTransform; info.compositeAlpha = alpha; info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        if(!vsync) {
+            std::uint32_t modeCount{};
+            vkCheck(vkGetPhysicalDeviceSurfacePresentModesKHR(physical,surface,&modeCount,nullptr),"Query present mode count");
+            std::vector<VkPresentModeKHR> modes(modeCount);
+            vkCheck(vkGetPhysicalDeviceSurfacePresentModesKHR(physical,surface,&modeCount,modes.data()),"Query present modes");
+            for(const auto preferred:{VK_PRESENT_MODE_IMMEDIATE_KHR,VK_PRESENT_MODE_MAILBOX_KHR})
+                if(std::ranges::find(modes,preferred)!=modes.end()) { info.presentMode=preferred;break; }
+        } info.clipped = VK_TRUE;
         vkCheck(vkCreateSwapchainKHR(device, &info, nullptr, &swapchain), "Create swapchain");
         vkCheck(vkGetSwapchainImagesKHR(device, swapchain, &count, nullptr), "Get swapchain images");
         images.resize(count); views.reserve(count); presented.resize(count);
@@ -537,7 +548,7 @@ struct VulkanRenderer::Impl {
             stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT; stages[1].module = fragment; stages[1].pName = "main";
             const std::array<VkVertexInputBindingDescription,2> bindings{{
                 {0,sizeof(Vertex),VK_VERTEX_INPUT_RATE_VERTEX},{1,sizeof(InstanceData),VK_VERTEX_INPUT_RATE_INSTANCE}}};
-            std::array<VkVertexInputAttributeDescription, 11> attributes{{
+            std::array<VkVertexInputAttributeDescription, 12> attributes{{
                 {0, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, position)},
                 {1, 0, VK_FORMAT_R32G32B32_SFLOAT, offsetof(Vertex, color)},
                 {2, 0, VK_FORMAT_R32G32_SFLOAT, offsetof(Vertex, uv)},
@@ -548,7 +559,8 @@ struct VulkanRenderer::Impl {
                 {7,1,VK_FORMAT_R32G32B32_SFLOAT,offsetof(InstanceData,offset)},
                 {8,1,VK_FORMAT_R32_SFLOAT,offsetof(InstanceData,yaw)},
                 {9,1,VK_FORMAT_R32G32_SFLOAT,offsetof(InstanceData,light)},
-                {10,1,VK_FORMAT_R32_SFLOAT,offsetof(InstanceData,phase)}}};
+                {10,1,VK_FORMAT_R32_SFLOAT,offsetof(InstanceData,phase)},
+                {11,0,VK_FORMAT_R32G32B32A32_SFLOAT,offsetof(Vertex,tileBounds)}}};
             auto vertexInput = vkStructure<VkPipelineVertexInputStateCreateInfo>(VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO);
             vertexInput.vertexBindingDescriptionCount=static_cast<std::uint32_t>(bindings.size());vertexInput.pVertexBindingDescriptions=bindings.data();
             vertexInput.vertexAttributeDescriptionCount=static_cast<std::uint32_t>(attributes.size());vertexInput.pVertexAttributeDescriptions=attributes.data();
@@ -768,9 +780,9 @@ struct VulkanRenderer::Impl {
     }
 };
 
-VulkanRenderer::VulkanRenderer(Window& window, const ImageRgba& atlas, bool requireValidation)
+VulkanRenderer::VulkanRenderer(Window& window, const ImageRgba& atlas, bool requireValidation,bool vsync)
     : validation_(std::make_unique<ValidationState>()), impl_(std::make_unique<Impl>(window, *validation_, requireValidation)) {
-    impl_->initialize(atlas);
+    impl_->vsync=vsync;impl_->initialize(atlas);
 }
 VulkanRenderer::~VulkanRenderer() = default;
 void VulkanRenderer::shutdown() { impl_.reset(); }
@@ -778,14 +790,19 @@ ValidationReport VulkanRenderer::validationReport() const {
     return {validation_->enabled, validation_->errors.load(), validation_->warnings.load()};
 }
 void VulkanRenderer::requestResize() { impl_->dirty = true; }
-bool VulkanRenderer::draw(const Camera& camera, const std::filesystem::path& screenshot) { return impl_->draw(camera, screenshot); }
+RenderMetrics VulkanRenderer::metrics() const { return impl_->metrics; }
+bool VulkanRenderer::draw(const Camera& camera, const std::filesystem::path& screenshot) {
+    const auto start=std::chrono::steady_clock::now();impl_->metrics.drawCalls=0;
+    const auto drawn=impl_->draw(camera,screenshot);
+    impl_->metrics.drawMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-start).count();return drawn;
+}
 std::size_t VulkanRenderer::meshCount() const { return impl_->meshes.size(); }
 std::size_t VulkanRenderer::triangleCount() const { return impl_->triangles; }
 std::size_t VulkanRenderer::drawnMeshCount() const { return impl_->drawnMeshes; }
 std::size_t VulkanRenderer::drawnTriangleCount() const { return impl_->drawnTriangles; }
 void VulkanRenderer::setSelection(std::optional<glm::i64vec3> block) { impl_->selection = block; }
 void VulkanRenderer::setHud(const Mesh& colored,const Mesh& textured,bool crosshairVisible,const Mesh& foreground) {
-    vkCheck(vkDeviceWaitIdle(impl_->device),"Wait before replacing HUD meshes");
+    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX),"Wait before replacing HUD meshes");
     auto colors=impl_->createMesh(colored),textures=impl_->createMesh(textured),front=impl_->createMesh(foreground);
     impl_->hudColors=std::move(colors);impl_->hudTextures=std::move(textures);
     impl_->hudForeground=std::move(front);
@@ -806,7 +823,7 @@ void VulkanRenderer::setAtmosphere(const Atmosphere& atmosphere) {
 std::size_t VulkanRenderer::drawnInstanceCount() const { return impl_->drawnInstances; }
 void VulkanRenderer::setModels(std::span<const Mesh> models) {
     if(models.size()>64) throw std::invalid_argument("Too many reusable models");
-    vkCheck(vkDeviceWaitIdle(impl_->device),"Wait before model upload");
+    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX),"Wait before model upload");
     std::vector<GpuMesh> uploaded;
     for(const auto& model:models) {
         if(!model.translucentIndices.empty()||model.origin!=glm::i64vec3(0)) throw std::invalid_argument("Instance models must be local and opaque");
@@ -831,7 +848,7 @@ void VulkanRenderer::setInstances(std::span<const RenderInstance> instances) {
     impl_->instances.assign(instances.begin(),instances.end());
 }
 void VulkanRenderer::upload(std::span<const Mesh> meshes) {
-    vkCheck(vkDeviceWaitIdle(impl_->device), "Wait before mesh upload");
+    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX), "Wait before mesh upload");
     std::vector<GpuMesh> uploaded;
     std::size_t triangles = 0;
     for (const auto& mesh : meshes) {
@@ -843,7 +860,8 @@ void VulkanRenderer::upload(std::span<const Mesh> meshes) {
 }
 void VulkanRenderer::updateMeshes(std::span<const Mesh> meshes) {
     if (meshes.empty()) return;
-    vkCheck(vkDeviceWaitIdle(impl_->device), "Wait before replacing chunk meshes");
+    const auto uploadStart=std::chrono::steady_clock::now();
+    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX), "Wait before replacing chunk meshes");
     std::vector<GpuMesh> replacements;
     for(const auto& mesh:meshes) replacements.push_back(impl_->createMesh(mesh));
     impl_->meshes.reserve(impl_->meshes.size()+replacements.size());
@@ -853,6 +871,7 @@ void VulkanRenderer::updateMeshes(std::span<const Mesh> meshes) {
         else if(it!=impl_->meshes.end()) *it=std::move(mesh);
         else impl_->meshes.push_back(std::move(mesh));
     }
+    impl_->metrics.uploadMilliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-uploadStart).count();
     impl_->triangles=0;
     for(const auto& mesh:impl_->meshes) impl_->triangles+=(mesh.indexCount+static_cast<std::size_t>(mesh.translucentCount))/3;
 }

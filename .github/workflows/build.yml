@@ -22,6 +22,14 @@ jobs:
         run: cmake --build build/ci --parallel 4
       - name: CPU and CLI tests (no display required)
         run: ctest --test-dir build/ci --output-on-failure
+      - name: Package client and dedicated server
+        run: cpack --config build/ci/CPackConfig.cmake -C ${{ matrix.config }}
+      - name: Smoke test extracted archives without GPU
+        run: python3 tests/package_smoke.py build/ci/packages/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voxelcraft-linux-${{ matrix.compiler }}-${{ matrix.config }}-rc1
+          path: build/ci/packages/*.tar.gz
   windows:
     runs-on: windows-2022
     steps:
@@ -43,7 +51,39 @@ jobs:
         run: cmake --build build/ci --config Release --parallel 4
       - name: CPU and CLI tests
         run: ctest --test-dir build/ci -C Release --output-on-failure
+      - name: Package client and dedicated server with runtime DLLs
+        run: cpack --config build/ci/CPackConfig.cmake -C Release
+      - name: Smoke test extracted archives without GPU
+        shell: pwsh
+        run: |
+          $archives = Get-ChildItem build/ci/packages/*.zip | ForEach-Object { $_.FullName }
+          python tests/package_smoke.py $archives
+          if ($LASTEXITCODE -ne 0) { throw 'Extracted archive smoke test failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: voxelcraft-windows-unverified-runtime
-          path: build/ci/bin/Release/
+          name: voxelcraft-windows-msvc-rc1-runtime-unverified
+          path: build/ci/packages/*.zip
+
+  sanitizers:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address-undefined, thread]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build clang
+      - name: Configure isolated CPU sanitizer build
+        run: cmake -S . -B build/sanitizer -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_COMPILER=clang++ -DVC_BUILD_CLIENT=OFF -DVC_SANITIZER=${{ matrix.sanitizer }}
+      - run: cmake --build build/sanitizer --parallel 4
+      - name: ASan and UBSan CPU regressions
+        if: matrix.sanitizer == 'address-undefined'
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build/sanitizer --output-on-failure
+      - name: Isolated worker TSan regressions
+        if: matrix.sanitizer == 'thread'
+        env:
+          TSAN_OPTIONS: halt_on_error=1
+        run: ctest --test-dir build/sanitizer --output-on-failure -R '^(TerrainWorker|MeshWorker|BackgroundMeshing|SnapshotWriter)\.'

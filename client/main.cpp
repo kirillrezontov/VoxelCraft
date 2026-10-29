@@ -44,7 +44,7 @@
 namespace {
 
 int run(const vc::client::Options& options) {
-    vc::Window window;
+    vc::Window window(options.width,options.height,options.fullscreen);
     const auto preferences=vc::client::loadPreferences(options);
     const auto settings=preferences.settings;const auto settingsFile=preferences.path;
     const double generationStart = vc::Window::seconds();
@@ -55,7 +55,7 @@ int run(const vc::client::Options& options) {
         modsDirectory=vc::Window::userDataPath()/"mods";
     vc::ModRuntime mods(modsDirectory,registry);
     const auto atlas=mods.atlas().layout();
-    vc::VulkanRenderer renderer(window,mods.atlas().image(),options.requireValidation);
+    vc::VulkanRenderer renderer(window,mods.atlas().image(),options.requireValidation,options.vsync);
     vc::log("Loaded "+std::to_string(mods.size())+" mods");
     for(const auto& id:mods.order()) vc::log("Mod: "+id);
     vc::voxel::WorldMetadata metadata{options.seed,options.bounds,options.generatorVersion.value_or(vc::voxel::terrainGenerationVersion)};
@@ -200,7 +200,7 @@ int run(const vc::client::Options& options) {
     if(store) snapshotWriter=std::make_unique<vc::voxel::SnapshotWriter>(*store);
     const auto finishSnapshot=[&](const vc::voxel::SnapshotResult& result) {
         result.rethrowIfFailed();
-        vc::log("Saved world revision "+std::to_string(result.revision)+" to "+vc::pathText(store->directory()));
+        vc::log("Saved world revision "+std::to_string(result.revision)+" in "+std::to_string(result.milliseconds)+" ms to "+vc::pathText(store->directory()));
         notify("SAVED WORLD "+std::to_string(result.revision));
     };
     const auto awaitSnapshot=[&] {
@@ -245,6 +245,7 @@ int run(const vc::client::Options& options) {
     auto screenshot = options.screenshot;
     if (options.smoke && screenshot.empty()) screenshot = window.assetPath().parent_path() / "smoke.ppm";
     while (true) {
+        const auto updateStart=vc::Window::seconds();
         auto input = window.poll();
         if(snapshotWriter) if(const auto result=snapshotWriter->takeReady()) {
             try { finishSnapshot(*result); }
@@ -412,6 +413,7 @@ int run(const vc::client::Options& options) {
         renderer.setInstances(instances);
         if(auto hud=ui.rebuild(registry,atlas,width,height,now))
             renderer.setHud(hud->colored,hud->textured,!ui.open(),hud->foreground);
+        const auto updateMilliseconds=(vc::Window::seconds()-updateStart)*1000;
         const auto captureAt = options.frameLimit ? options.frameLimit - 1 : 60;
         const auto capture = !capturedScreenshot && !screenshot.empty() && frames >= captureAt;
         if (renderer.draw(camera, capture ? screenshot : std::filesystem::path{})) {
@@ -422,14 +424,15 @@ int run(const vc::client::Options& options) {
             const double fps = static_cast<double>(diagnosticFrames) / (now - diagnosticStart);
             std::ostringstream info;
             info << std::fixed << std::setprecision(1) << "VoxelCraft " VC_VERSION_STRING " | " << fps << " FPS / " << (fps > 0 ? 1000 / fps : 0)
-                 << " ms | xyz " << camera.position.x << ',' << camera.position.y << ',' << camera.position.z
+                 << " ms | update/draw/upload ms "<<updateMilliseconds<<"/"<<renderer.metrics().drawMilliseconds<<"/"<<renderer.metrics().uploadMilliseconds<<" | calls "<<renderer.metrics().drawCalls
+                 << " | xyz " << camera.position.x << ',' << camera.position.y << ',' << camera.position.z
                  << (player.flying ? " | Fly" : " | Walk") << (survivalMode?" | Survival":" | Creative")
                  << " | slot " << (survivalMode?survival.inventory.selectedSlot():inventory.selectedSlot())+1
                  << " | place " << (material==vc::voxel::air?"empty":registry.definition(material).identifier)
                  << " | target " << (hit ? registry.definition(world.block(hit->block)).identifier : "none")
                  << " | loaded " << world.chunks().size() << " / meshes " << renderer.meshCount()
                  << " / drawn " << renderer.drawnMeshCount() << " | triangles " << renderer.drawnTriangleCount() << '/' << renderer.triangleCount();
-            if(streamer) info<<" | terrain pending "<<streamer->pendingCount()<<" / mesh pending "<<(backgroundMeshes?backgroundMeshes->pendingCount():meshQueue.pendingCount())
+            if(streamer) info<<" | gen ms "<<streamer->generationMetrics().lastMilliseconds<<" | mesh ms "<<(backgroundMeshes?backgroundMeshes->metrics().lastMilliseconds:0)<<" | terrain pending "<<streamer->pendingCount()<<" / mesh pending "<<(backgroundMeshes?backgroundMeshes->pendingCount():meshQueue.pendingCount())
                 <<" | cached edits "<<streamer->cachedCount()<<" / "<<streamer->cachedBytes()<<" bytes";
             info<<" | "<<day.clock()<<" | "<<vc::voxel::biomeName(generator.biomeAt(cameraBlock().x,cameraBlock().z));
             info<<" | creatures "<<living.creatureCount()<<" / loot "<<living.dropCount()<<" / drawn "<<renderer.drawnInstanceCount();
@@ -468,8 +471,9 @@ int main(int argc, char** argv) {
         const auto options = vc::client::parseOptions(argc, argv);
         if (options.help) {
             std::cout << "VoxelCraft " VC_VERSION_STRING "\n--seed N --radius 1..6 --min-y N --max-y N --frames N --screenshot file.ppm --smoke --require-validation --fly\n"
+                "--width N --height N --fullscreen / --windowed --vsync / --no-vsync\n"
                 "--world-dir PATH (create/load a saved world) --no-save (temporary world)\n"
-                "--connect HOST[:PORT] --name PLAYER (multiplayer; server controls world and game mode)\n"
+                "--connect HOST[:PORT] --name PLAYER --identity-file PATH (multiplayer; server controls world and game mode)\n"
                 "--mods-dir PATH (load mod packs) --no-mods (retain saved mod data without loading packs)\n"
                 "--survival (quantities, crafting, mining and health) --creative (infinite blocks and flight)\n"
                 "--generator-version 1..3 (new worlds only; saved worlds retain their version)\n"

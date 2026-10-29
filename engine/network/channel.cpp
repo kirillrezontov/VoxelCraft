@@ -35,21 +35,27 @@ bool FramedConnection::queue(std::span<const std::uint8_t> payload) {
 void FramedConnection::pump(std::size_t budget) {
     if(!budget||budget>maxFrameBytes) throw std::invalid_argument("TCP pump budget must be 1..4 MiB");
     if(!open()) return;
-    std::size_t sent=0;
-    while(!outgoing_.empty()&&sent<budget) {
-        const auto remaining=std::span<const std::uint8_t>(outgoing_.front()).subspan(offset_);
-        const auto result=stream_.send(remaining.first(std::min(remaining.size(),budget-sent)));
-        if(result.closed) { close();return; }
-        if(!result.bytes) break;
-        sent+=result.bytes;offset_+=result.bytes;outgoingBytes_-=result.bytes;
-        if(offset_==outgoing_.front().size()) { outgoing_.pop_front();offset_=0; }
-    }
-    std::array<std::uint8_t,16384> buffer{};std::size_t received=0;
-    while(received<budget) {
-        const auto result=stream_.receive(std::span(buffer).first(std::min(buffer.size(),budget-received)));
-        if(result.closed) { incoming_.finish();stream_.close();outgoing_.clear();outgoingBytes_=offset_=0;return; }
-        if(!result.bytes) break;
-        incoming_.feed(std::span(buffer).first(result.bytes));received+=result.bytes;
+    try {
+        std::size_t sent=0;
+        while(!outgoing_.empty()&&sent<budget) {
+            const auto remaining=std::span<const std::uint8_t>(outgoing_.front()).subspan(offset_);
+            const auto result=stream_.send(remaining.first(std::min(remaining.size(),budget-sent)));
+            if(result.closed) { close();return; }
+            if(!result.bytes) break;
+            sent+=result.bytes;sentBytes_+=result.bytes;offset_+=result.bytes;outgoingBytes_-=result.bytes;
+            if(offset_==outgoing_.front().size()) { outgoing_.pop_front();offset_=0; }
+        }
+        std::array<std::uint8_t,16384> buffer{};std::size_t received=0;
+        while(received<budget) {
+            const auto result=stream_.receive(std::span(buffer).first(std::min(buffer.size(),budget-received)));
+            if(result.closed) { incoming_.finish();stream_.close();outgoing_.clear();outgoingBytes_=offset_=0;return; }
+            if(!result.bytes) break;
+            incoming_.feed(std::span(buffer).first(result.bytes));received+=result.bytes;receivedBytes_+=result.bytes;
+        }
+    } catch(...) {
+        // A framing/transport failure is terminal. In particular a truncated EOF
+        // must not leave an apparently open socket occupying a server slot.
+        close();throw;
     }
 }
 void FramedConnection::close() { stream_.close();outgoing_.clear();outgoingBytes_=offset_=0; }

@@ -1,4 +1,5 @@
 #pragma once
+#include "engine/core/work_metrics.hpp"
 #include "engine/voxel/generation.hpp"
 #include <condition_variable>
 #include <deque>
@@ -20,6 +21,7 @@ public:
     bool request(Position chunk);
     std::optional<Chunk> takeReady();
     std::size_t pendingCount() const;
+    WorkMetrics metrics() const;
 private:
     void run(std::stop_token stop);
     TerrainGenerator generator_;
@@ -30,6 +32,7 @@ private:
     std::deque<Chunk> ready_;
     std::set<Position> pending_;
     std::exception_ptr failure_;
+    WorkMetrics metrics_;
     // Destroy first: request stop, wake via stop-aware wait, and join before data.
     std::jthread thread_;
 };

@@ -6,11 +6,11 @@
 #include "game/modding/runtime.hpp"
 
 namespace vc::netgame {
-inline constexpr std::uint32_t protocolVersion=2;
+inline constexpr std::uint32_t protocolVersion=3;
 inline constexpr std::size_t maxPlayers=8,maxNetworkBlocks=8192;
 enum class Message : std::uint32_t { Hello=1,Welcome,Input,Hotbar,Chunk,Unload,State,Notice,Reject,Save,Goodbye,Inventory };
 enum InputFlags : std::uint32_t { Active=1,Jump=2,ToggleFlight=4,Destroy=8,Place=16,AttackHeld=32,Respawn=64 };
-struct Hello { std::uint64_t fingerprint{};std::string name; };
+struct Hello { std::uint64_t fingerprint{};std::string name;std::string identityToken{}; };
 struct Welcome {
     std::uint64_t id{},tick{};
     voxel::WorldMetadata metadata;

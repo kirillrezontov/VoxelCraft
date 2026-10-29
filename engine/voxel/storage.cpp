@@ -2,6 +2,7 @@
 #include "engine/voxel/storage.hpp"
 #include "engine/core/binary.hpp"
 #include "engine/platform/file_lock.hpp"
+#include "engine/platform/file_sync.hpp"
 #include <algorithm>
 #include <charconv>
 #include <fstream>
@@ -49,6 +50,7 @@ void writeFile(const std::filesystem::path& path,binary::Writer& out) {
     file.write(reinterpret_cast<const char*>(out.bytes.data()),static_cast<std::streamsize>(out.bytes.size()));
     file.close();
     if(!file) throw std::runtime_error("Cannot write save file: "+vc::pathText(path));
+    vc::syncFile(path);
 }
 void version(binary::Reader& in) { if(in.u32()!=worldFormatVersion) throw std::runtime_error("Unsupported world format version"); }
 void validate(const WorldMetadata& metadata) {
@@ -162,6 +164,7 @@ std::uint64_t WorldStore::save(const World& world,const BlockRegistry& registry,
         throw std::invalid_argument("Save metadata height bounds do not match world");
     if(world.chunks().size()>maxChunks||gameData.size()>maxGameDataBytes) throw std::runtime_error("World exceeds snapshot format limits");
     const auto root=directory_/"snapshots";std::filesystem::create_directories(root);
+    vc::syncDirectory(directory_);
     auto available=revisions(root);
     if(!available.empty()&&available.back()==std::numeric_limits<std::uint64_t>::max()) throw std::overflow_error("World save revision exhausted");
     const auto revision=available.empty()?1:available.back()+1;
@@ -181,7 +184,8 @@ std::uint64_t WorldStore::save(const World& world,const BlockRegistry& registry,
         out.u32(static_cast<std::uint32_t>(gameData.size()));out.raw(gameData);writeFile(staging/"world.vcw",out);
         // A new destination name works on Windows as well as Linux. Never replace
         // individual live files or expose a manifest referring to half-written data.
-        std::filesystem::rename(staging,root/std::to_string(revision));
+        vc::syncDirectory(staging);
+        vc::publishDirectory(staging,root/std::to_string(revision));
     } catch(...) {
         std::error_code ignored;std::filesystem::remove_all(staging,ignored);throw;
     }

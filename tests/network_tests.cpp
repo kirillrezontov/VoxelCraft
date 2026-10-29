@@ -73,5 +73,5 @@ TEST(NetworkFrames, DisconnectRejectsTruncatedFrameAndKeepsCompleteMessages) {
         try { partialServer.pump(); } catch(const std::runtime_error&) { failed=true; }
         if(!failed) std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    EXPECT_TRUE(failed);
+    EXPECT_TRUE(failed);EXPECT_FALSE(partialServer.open());
 }

@@ -27,9 +27,10 @@ void SnapshotWriter::run(std::stop_token stop) {
             if(!request_) return;
             job=std::move(request_);request_.reset();
         }
-        SnapshotResult result;
+        SnapshotResult result;const auto started=std::chrono::steady_clock::now();
         try { result.revision=store_.save(job->world,job->registry,job->metadata,job->gameData); }
         catch(...) { result.failure=std::current_exception(); }
+        result.milliseconds=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();
         {
             std::lock_guard lock(mutex_);ready_=std::move(result);wake_.notify_all();
         }

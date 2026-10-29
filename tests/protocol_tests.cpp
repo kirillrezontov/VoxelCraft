@@ -34,7 +34,7 @@ TEST(GameProtocol, HandshakeProfilePaletteAndVersionFailures) {
     const auto source=welcome();const auto restored=vc::netgame::decodeWelcome(vc::netgame::encode(source));
     EXPECT_EQ(restored.id,7u);EXPECT_EQ(restored.blocks,source.blocks);EXPECT_EQ(restored.profile.camera.position,source.profile.camera.position);
     EXPECT_EQ(restored.profile.hotbar,source.profile.hotbar);EXPECT_EQ(restored.radius,2u);
-    auto invalid=source;invalid.blocks.push_back(invalid.blocks[0]);EXPECT_THROW(vc::netgame::encode(invalid),std::runtime_error);
+    auto invalid=source;invalid.blocks.push_back("voxelcraft:air");EXPECT_THROW(vc::netgame::encode(invalid),std::runtime_error);
     invalid=source;invalid.metadata.bounds.maxY=2000000;EXPECT_THROW(vc::netgame::encode(invalid),std::runtime_error);
     invalid=source;invalid.profile.name="bad name";EXPECT_THROW(vc::netgame::encode(invalid),std::runtime_error);
 }

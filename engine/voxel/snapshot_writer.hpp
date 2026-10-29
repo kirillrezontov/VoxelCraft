@@ -8,6 +8,7 @@
 namespace vc::voxel {
 struct SnapshotResult {
     std::uint64_t revision{};
+    double milliseconds{};
     std::exception_ptr failure;
     void rethrowIfFailed() const { if(failure) std::rethrow_exception(failure); }
 };

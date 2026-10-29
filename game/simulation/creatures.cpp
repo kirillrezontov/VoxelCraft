@@ -167,8 +167,16 @@ CreatureEvents LivingWorld::update(double seconds,const voxel::World& world,cons
             if(moved.blocked.y) motion.velocity.y=0;
             const auto distance=[&](const LivingPlayer& player) { const auto d=player.position-(motion.position+glm::dvec3(0,1,0));return glm::dot(d,d); };
             std::array<const LivingPlayer*,8> candidates{};std::size_t count=0;
-            for(const auto& player:players) if(player.survival&&player.survival->alive()&&distance(player)<2.25) candidates[count++]=&player;
-            std::sort(candidates.begin(),candidates.begin()+static_cast<std::ptrdiff_t>(count),[&](const auto* a,const auto* b){return distance(*a)<distance(*b);});
+            for(const auto& player:players) if(player.survival&&player.survival->alive()&&distance(player)<2.25) {
+                // At most eight candidates: bounded insertion avoids generic
+                // introsort's small-array overread diagnostics on GCC 16.
+                if(count>=candidates.size()) throw std::logic_error("Too many loot pickup candidates");
+                auto index=count++;
+                while(index>0&&distance(player)<distance(*candidates[index-1])) {
+                    candidates[index]=candidates[index-1];--index;
+                }
+                candidates[index]=&player;
+            }
             for(std::size_t i=0;i<count;++i) if(candidates[i]->survival->inventory.add(dropped.stack.item,dropped.stack.count,items,dropped.stack.durability)) {
                 ++events.collected;remove.push_back(e);break;
             }

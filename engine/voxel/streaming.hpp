@@ -38,6 +38,7 @@ public:
     std::size_t wantedCount() const { return wanted_.size(); }
     std::size_t cachedCount() const { return retained_.size(); }
     std::size_t cachedBytes() const;
+    WorkMetrics generationMetrics() const { return worker_.metrics(); }
     std::size_t pendingCount() const { return worker_.pendingCount(); }
 private:
     World& world_;

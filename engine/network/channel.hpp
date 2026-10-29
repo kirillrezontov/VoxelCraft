@@ -29,6 +29,8 @@ public:
     void pump(std::size_t budget=256*1024);
     std::optional<binary::Bytes> take() { return incoming_.take(); }
     bool open() const { return stream_.open(); }
+    std::uint64_t sentBytes() const { return sentBytes_; }
+    std::uint64_t receivedBytes() const { return receivedBytes_; }
     std::size_t queuedBytes() const { return outgoingBytes_; }
     void close();
 private:
@@ -36,5 +38,6 @@ private:
     FrameDecoder incoming_;
     std::deque<binary::Bytes> outgoing_;
     std::size_t offset_{},outgoingBytes_{};
+    std::uint64_t sentBytes_{},receivedBytes_{};
 };
 }

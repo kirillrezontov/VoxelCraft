@@ -129,9 +129,9 @@ TEST(Terrain, ChunkSeamsAndPartialHeightBounds) {
 TEST(Mesher, EmptyAndSingleCubeWinding) {
     const auto registry = vc::builtinBlocks(); World world;
     Chunk chunk({-1, 0, 0});
-    EXPECT_TRUE(meshChunk(chunk, world, registry, vc::builtinAtlasLayout()).indices.empty());
+    EXPECT_TRUE(meshChunk(chunk, world, registry, vc::builtinAtlasLayout(),nullptr,false).indices.empty());
     chunk.set({0, 0, 0}, registry.require("voxelcraft:stone"));
-    const auto mesh = meshChunk(chunk, world, registry, vc::builtinAtlasLayout());
+    const auto mesh = meshChunk(chunk, world, registry, vc::builtinAtlasLayout(),nullptr,false);
     EXPECT_EQ(mesh.origin, glm::i64vec3(-32, 0, 0));
     ASSERT_EQ(mesh.vertices.size(), 24u); ASSERT_EQ(mesh.indices.size(), 36u);
     const std::array<glm::vec3, 6> normals{{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
@@ -144,26 +144,26 @@ TEST(Mesher, EmptyAndSingleCubeWinding) {
 TEST(Mesher, AdjacentCubesAndNegativeChunkSeam) {
     const auto registry = vc::builtinBlocks(); World world;
     Chunk a({-1, 0, 0}); a.set({31, 0, 0}, 1); a.set({30, 0, 0}, 1);
-    EXPECT_EQ(meshChunk(a, world, registry, vc::builtinAtlasLayout()).indices.size(), 10u * 6);
+    EXPECT_EQ(meshChunk(a, world, registry, vc::builtinAtlasLayout(),nullptr,false).indices.size(), 10u * 6);
     world.insert(std::move(a));
     Chunk b({0, 0, 0}); b.set({0, 0, 0}, 1); world.insert(std::move(b));
-    EXPECT_EQ(meshChunk(world.chunks().at({-1, 0, 0}), world, registry, vc::builtinAtlasLayout()).indices.size(), 9u * 6);
-    EXPECT_EQ(meshChunk(world.chunks().at({0, 0, 0}), world, registry, vc::builtinAtlasLayout()).indices.size(), 5u * 6);
+    EXPECT_EQ(meshChunk(world.chunks().at({-1, 0, 0}), world, registry, vc::builtinAtlasLayout(),nullptr,false).indices.size(), 9u * 6);
+    EXPECT_EQ(meshChunk(world.chunks().at({0, 0, 0}), world, registry, vc::builtinAtlasLayout(),nullptr,false).indices.size(), 5u * 6);
 }
 TEST(Mesher, FullySolidChunkAndSixNeighbors) {
     const auto registry = vc::builtinBlocks(); World world;
     world.insert(Chunk({0, 0, 0}, 1));
-    EXPECT_EQ(meshChunk(world.chunks().at({0, 0, 0}), world, registry, vc::builtinAtlasLayout()).indices.size(), 6u * 32 * 32 * 6);
+    EXPECT_EQ(meshChunk(world.chunks().at({0, 0, 0}), world, registry, vc::builtinAtlasLayout(),nullptr,false).indices.size(), 6u * 32 * 32 * 6);
     for (const Position p : {Position{1,0,0}, Position{-1,0,0}, Position{0,1,0}, Position{0,-1,0}, Position{0,0,1}, Position{0,0,-1}})
         world.insert(Chunk(p, 1));
-    EXPECT_TRUE(meshChunk(world.chunks().at({0, 0, 0}), world, registry, vc::builtinAtlasLayout()).indices.empty());
+    EXPECT_TRUE(meshChunk(world.chunks().at({0, 0, 0}), world, registry, vc::builtinAtlasLayout(),nullptr,false).indices.empty());
 }
 TEST(Mesher, PartialVerticalChunkAndExtremeCoordinates) {
     const auto registry = vc::builtinBlocks(); World world({5, 5});
     Chunk chunk({0, 0, 0}, 1);
-    EXPECT_EQ(meshChunk(chunk, world, registry, vc::builtinAtlasLayout()).indices.size(), (2u * 32 * 32 + 4u * 32) * 6);
+    EXPECT_EQ(meshChunk(chunk, world, registry, vc::builtinAtlasLayout(),nullptr,false).indices.size(), (2u * 32 * 32 + 4u * 32) * 6);
     World wide;
     Chunk extreme({chunkAxis(INT64_MAX), 0, chunkAxis(INT64_MIN)});
     extreme.set({31, 0, 0}, 1);
-    EXPECT_EQ(meshChunk(extreme, wide, registry, vc::builtinAtlasLayout()).indices.size(), 36u);
+    EXPECT_EQ(meshChunk(extreme, wide, registry, vc::builtinAtlasLayout(),nullptr,false).indices.size(), 36u);
 }

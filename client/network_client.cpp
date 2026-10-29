@@ -5,6 +5,7 @@
 #include "engine/renderer/vulkan_renderer.hpp"
 #include "engine/voxel/lighting.hpp"
 #include "engine/voxel/mesh_worker.hpp"
+#include "game/network/identity.hpp"
 #include "engine/voxel/raycast.hpp"
 #include "engine/voxel/streaming.hpp"
 #include "game/content/blocks.hpp"
@@ -39,14 +40,14 @@ void shutdown(VulkanRenderer& renderer) {
 }
 }
 int runRemote(const Options& options) {
-    Window window;const auto preferences=loadPreferences(options);auto blocks=builtinBlocks();auto directory=options.modsDirectory;
+    Window window(options.width,options.height,options.fullscreen);const auto preferences=loadPreferences(options);auto blocks=builtinBlocks();auto directory=options.modsDirectory;
     if(directory.empty()&&!options.noMods&&!options.frameLimit) directory=Window::userDataPath()/"mods";
     ModRuntime mods(directory,blocks);const auto atlas=mods.atlas().layout();
     auto items=builtinItems(blocks);auto recipes=builtinRecipes(items);mods.installItems(items,blocks,recipes);
     MiningRules mining(blocks,items);mods.installMining(mining,blocks,items);
     const auto fingerprint=netgame::contentFingerprint(blocks,items,recipes,mining,mods);
-    VulkanRenderer renderer(window,mods.atlas().image(),options.requireValidation);
-    netgame::RemoteSession session(options.connectHost,options.connectPort,options.playerName,fingerprint,blocks);
+    VulkanRenderer renderer(window,mods.atlas().image(),options.requireValidation,options.vsync);
+    netgame::RemoteSession session(options.connectHost,options.connectPort,options.playerName,fingerprint,blocks,options.identityFile.empty()?std::string{}:netgame::readIdentityToken(options.identityFile));
     log("Connecting to "+options.connectHost+':'+std::to_string(options.connectPort)+" as "+options.playerName);
     while(!session.welcome()) {
         const auto input=window.poll();if(input.quit) { session.disconnect();shutdown(renderer);return options.frameLimit?1:0; }
@@ -74,6 +75,7 @@ int runRemote(const Options& options) {
     const auto notify=[&](std::string message) { ui.status(std::move(message),Window::seconds()); };
     notify("CONNECTED AS "+welcome.profile.name);window.pointerMode(false);window.capture(true);
     for(;;) {
+        const auto updateStart=Window::seconds();
         auto input=window.poll();if(input.quit) { quitWithoutSaving=input.quitWithoutSaving;break; }
         if(input.resized) renderer.requestResize();
         session.pump();
@@ -163,6 +165,7 @@ int runRemote(const Options& options) {
         }
         std::erase_if(avatars,[&](const auto& entry){return !present.contains(entry.first);});renderer.setInstances(instances);
         if(auto hud=ui.rebuild(blocks,atlas,width,height,now)) renderer.setHud(hud->colored,hud->textured,!ui.open(),hud->foreground);
+        const auto updateMilliseconds=(Window::seconds()-updateStart)*1000;
         const bool capture=!capturedScreenshot&&!options.screenshot.empty()&&everReady&&frames>=(options.frameLimit?options.frameLimit-1:60);
         if(renderer.draw(camera,capture?options.screenshot:std::filesystem::path{})) {
             if(everReady) { ++frames;++diagnosticFrames; }if(capture) capturedScreenshot=true;
@@ -171,6 +174,8 @@ int runRemote(const Options& options) {
             const auto fps=static_cast<double>(diagnosticFrames)/(now-diagnostic);std::ostringstream title;
             title<<std::fixed<<std::setprecision(1)<<"VoxelCraft " VC_VERSION_STRING " | "<<welcome.profile.name<<" | "<<fps<<" FPS | "<<state.players.size()<<" players"
                 <<" | "<<(welcome.survival?"Survival":session.flying()?"Fly":"Walk")<<" | xyz "<<camera.position.x<<','<<camera.position.y<<','<<camera.position.z
+                <<" | update/draw/upload ms "<<updateMilliseconds<<"/"<<renderer.metrics().drawMilliseconds<<"/"<<renderer.metrics().uploadMilliseconds<<" | calls "<<renderer.metrics().drawCalls
+                <<" | triangles "<<renderer.drawnTriangleCount()<<"/"<<renderer.triangleCount()<<" | drawn chunks "<<renderer.drawnMeshCount()<<" | mesh ms "<<meshes.metrics().lastMilliseconds<<" | net KiB tx/rx "<<session.sentBytes()/1024<<"/"<<session.receivedBytes()/1024
                 <<" | chunks "<<session.world().chunks().size()<<" | mesh pending "<<meshes.pendingCount();
             window.title(title.str());log(title.str());diagnostic=now;diagnosticFrames=0;
         }

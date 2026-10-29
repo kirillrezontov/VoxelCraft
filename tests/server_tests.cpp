@@ -204,3 +204,86 @@ TEST(ServerHost, AsynchronousSaveFailureKeepsPeersAndEditsAvailableForRetry) {
     EXPECT_EQ(archive->revision,2u);EXPECT_EQ(archive->world.block(placed),blocks.require("voxelcraft:lamp"));
     const auto saved=vc::decodePlayer(archive->gameData);ASSERT_EQ(saved.profiles.size(),2u);EXPECT_EQ(saved.profiles[0].hotbar[0],"voxelcraft:lamp");
 }
+
+TEST(ServerIdentity, CredentialsBindSavedProfilesAcrossRestartAndDoNotEnterWorldData) {
+    vc::test::TempDirectory temp;createFlyingWorld(temp.path());auto settings=config();settings.worldDirectory=temp.path();
+    const std::string aliceToken(64,'a'),bobToken(64,'b');settings.profileTokens={{"alice",aliceToken},{"bob",bobToken}};
+    for(int restart=0;restart<2;++restart) {
+        vc::server::Host host(settings);ASSERT_TRUE(settle(host,[&]{return host.ready();}));
+        for(const std::string& token:{std::string{},bobToken}) {
+            auto registry=vc::builtinBlocks();vc::netgame::RemoteSession impostor("127.0.0.1",host.port(),"ALICE",host.fingerprint(),registry,token);
+            const std::array clients{&impostor};
+            EXPECT_THROW(settle(host,[]{return false;},clients),std::runtime_error);EXPECT_EQ(host.playerCount(),0u);
+        }
+        auto registry=vc::builtinBlocks();vc::netgame::RemoteSession alice("127.0.0.1",host.port(),"ALICE",host.fingerprint(),registry,aliceToken);
+        const std::array clients{&alice};ASSERT_TRUE(settle(host,[&]{return alice.welcome()!=nullptr;},clients));
+        EXPECT_EQ(alice.welcome()->profile.name,"Alice");EXPECT_EQ(alice.welcome()->profile.selectedSlot,2u);
+        alice.disconnect();ASSERT_TRUE(settle(host,[&]{return host.playerCount()==0;}));host.save();
+    }
+    vc::voxel::WorldStore store(temp.path());auto registry=vc::builtinBlocks();const auto archive=store.load(registry);ASSERT_TRUE(archive);
+    EXPECT_EQ(archive->gameData.find(aliceToken),std::string::npos);EXPECT_EQ(archive->gameData.find(bobToken),std::string::npos);
+}
+TEST(ServerIdentity, PublicBindRequiresCredentialsOrExplicitTrustedNetwork) {
+    auto settings=config();settings.bindAddress="0.0.0.0";
+    EXPECT_THROW(vc::server::Host host(settings),std::invalid_argument);
+    settings.profileTokens={{"alice","invalid"}};EXPECT_THROW(vc::server::Host host(settings),std::invalid_argument);
+    settings.profileTokens.clear();settings.trustedLan=true;EXPECT_NO_THROW(vc::server::Host host(settings));
+}
+TEST(ServerHost, IdleSessionExpiresAndShutdownExplainsDisconnect) {
+    auto settings=config();vc::server::Host host(settings);ASSERT_TRUE(settle(host,[&]{return host.ready();}));
+    auto registry=vc::builtinBlocks();vc::netgame::RemoteSession alice("127.0.0.1",host.port(),"Alice",host.fingerprint(),registry);
+    const std::array clients{&alice};ASSERT_TRUE(settle(host,[&]{return alice.welcome()!=nullptr;},clients));
+    // Read snapshots, but send no input heartbeat for the full bounded idle period.
+    bool timedOut=false;
+    for(int n=0;n<1850&&!timedOut;++n) {
+        host.tick(1.0/60);
+        try { alice.pump(); } catch(const std::runtime_error& error) { timedOut=std::string(error.what()).find("timed out")!=std::string::npos; }
+    }
+    EXPECT_TRUE(timedOut);
+    for(int n=0;n<65;++n) host.tick(1.0/60);
+    EXPECT_EQ(host.playerCount(),0u);EXPECT_EQ(host.profiles().size(),1u);
+    vc::netgame::RemoteSession rejoin("127.0.0.1",host.port(),"Alice",host.fingerprint(),registry);
+    const std::array again{&rejoin};ASSERT_TRUE(settle(host,[&]{return rejoin.welcome()!=nullptr;},again));
+    host.shutdown();
+    try { rejoin.pump();FAIL()<<"Expected explicit shutdown reason"; }
+    catch(const std::runtime_error& error) { EXPECT_NE(std::string(error.what()).find("Server shutting down"),std::string::npos); }
+    EXPECT_FALSE(rejoin.open());
+}
+TEST(ServerIdentity, IdentityFilesRejectAmbiguousOrOversizedCredentials) {
+    vc::test::TempDirectory temp;const auto file=temp.path()/"identities";const std::string token(64,'a');
+    std::ofstream(file)<<"Alice "<<token<<"\nBob "<<std::string(64,'b')<<"\n";
+    const auto entries=vc::netgame::readProfileTokens(file);EXPECT_EQ(entries.at("alice"),token);EXPECT_EQ(entries.size(),2u);
+    std::ofstream(file)<<token<<"\n";EXPECT_EQ(vc::netgame::readIdentityToken(file),token);
+    EXPECT_THROW(vc::netgame::readProfileTokens(file),std::runtime_error);
+    std::ofstream(file)<<"Alice "<<token<<"\nALICE "<<token;EXPECT_THROW(vc::netgame::readProfileTokens(file),std::runtime_error);
+    std::ofstream(file)<<token<<" extra";EXPECT_THROW(vc::netgame::readIdentityToken(file),std::runtime_error);
+    std::ofstream(file)<<std::string(4097,'a');EXPECT_THROW(vc::netgame::readProfileTokens(file),std::runtime_error);
+    EXPECT_FALSE(vc::netgame::equalIdentityToken(token,std::string(64,'b')));EXPECT_TRUE(vc::netgame::equalIdentityToken(token,token));
+}
+
+TEST(ServerHost, ProtocolMismatchAndCommandFloodDoNotInterruptAnotherPlayer) {
+    vc::server::Host host(config());ASSERT_TRUE(settle(host,[&]{return host.ready();}));
+    auto aliceBlocks=vc::builtinBlocks(),spamBlocks=vc::builtinBlocks();
+    vc::netgame::RemoteSession alice("127.0.0.1",host.port(),"Alice",host.fingerprint(),aliceBlocks);
+    const std::array aliceOnly{&alice};ASSERT_TRUE(settle(host,[&]{return alice.welcome()!=nullptr;},aliceOnly));
+    vc::net::FramedConnection old(vc::net::TcpStream::connect("127.0.0.1",host.port()));
+    auto hello=vc::netgame::encode(vc::netgame::Hello{host.fingerprint(),"Old"});hello[9]=2;
+    ASSERT_TRUE(old.queue(hello));old.pump();
+    bool rejected=false;
+    for(int i=0;i<10&&!rejected;++i) {
+        host.tick(1.0/60);old.pump();alice.pump();
+        if(auto message=old.take()) {
+            EXPECT_EQ(vc::netgame::messageType(*message),vc::netgame::Message::Reject);
+            EXPECT_NE(vc::netgame::decodeText(*message,vc::netgame::Message::Reject).find("protocol version"),std::string::npos);rejected=true;
+        }
+    }
+    EXPECT_TRUE(rejected);EXPECT_EQ(host.profiles().size(),1u);
+    vc::netgame::RemoteSession spam("127.0.0.1",host.port(),"Spam",host.fingerprint(),spamBlocks);
+    const std::array both{&alice,&spam};ASSERT_TRUE(settle(host,[&]{return spam.welcome()!=nullptr;},both));
+    for(std::size_t i=0;i<vc::net::maxQueuedFrames;++i) spam.input({});
+    spam.pump();host.tick(1.0/60);alice.pump();
+    for(int i=0;i<10;++i) { host.tick(1.0/60);alice.pump(); }
+    EXPECT_EQ(host.playerCount(),1u);EXPECT_TRUE(alice.open());
+    vc::netgame::Input input;input.flags=vc::netgame::Active;alice.input(input);alice.pump();
+    ASSERT_TRUE(settle(host,[&]{return alice.state().players.size()==1;},aliceOnly));
+}

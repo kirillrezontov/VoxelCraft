@@ -1,5 +1,6 @@
 #pragma once
 #include "game/network/protocol.hpp"
+#include "game/network/identity.hpp"
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -16,6 +17,8 @@ struct HostConfig {
     std::uint16_t port{25565};
     int radius{2};
     bool populate{true};
+    bool trustedLan{}; // Explicit opt-in for unauthenticated non-loopback hosting.
+    netgame::ProfileTokens profileTokens;
 };
 // Authoritative host. The same CPU world/player/mod/actor services run
 // here without creating an SDL window or a Vulkan device.
@@ -27,6 +30,7 @@ public:
     Host& operator=(const Host&)=delete;
     void tick(double seconds);
     std::uint64_t save(); // Zero for a temporary world.
+    void shutdown(); // Call after a successful final save; best-effort bounded notification.
     bool ready() const;
     std::uint16_t port() const;
     std::size_t playerCount() const;

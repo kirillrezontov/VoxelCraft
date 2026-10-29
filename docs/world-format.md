@@ -26,13 +26,18 @@ The main thread holds an OS-owned exclusive session lock. The empty lock file is
 retained; its existence does not indicate an active lock. The OS releases the lock
 on process termination. Platform-specific locking stays in `engine/platform`.
 
-A save writes a complete snapshot into `snapshots/.writing-N`, closes all files,
+A save writes a complete snapshot into `snapshots/.writing-N`, closes and syncs all files,
 then renames the directory to the fresh revision `N`. Readers use the highest
 canonical unsigned integer directory name and ignore staging directories. Thus an
 interrupted save never exposes a half-written committed revision. The two most
 recent revisions are retained; older cleanup is best-effort. This is atomic
 visibility for ordinary local filesystems, not a guarantee of power-loss durability
-or unusual network filesystem semantics. Explicit fsync is not implemented.
+or unusual network filesystem semantics. v0.8.1 adds file fsync and staging/parent
+directory barriers on POSIX. Windows uses FlushFileBuffers and write-through
+publication to a fresh name; no portable directory flush equivalent is claimed.
+Any synchronization error is reported as a failed save. The preceding revision
+remains available; a failure after publication can leave a valid new revision,
+which is safe to retain and retry. No format bytes or version numbers change.
 
 A corrupt latest revision fails explicitly. To recover: close all clients, back
 up the entire world directory, then move the damaged highest revision outside
@@ -161,8 +166,10 @@ The current client saves modified chunks and legacy retained chunks, including
 edited chunks outside residency. Untouched generated terrain is regenerated from
 the recorded seed/version; exact saved chunk data is never regenerated over edits.
 Storage APIs still accept full worlds, so older full snapshots remain readable.
-Snapshot writes run synchronously. Incremental/region journaling, lazy on-disk
-paging and background saving remain planned. The compact in-memory edit cache
+Snapshot capture runs on the main thread; serialization and durable writes use
+one bounded background worker with an owned world/registry/game-data snapshot.
+Shutdown completes required writes or reports failure, retaining live edits for
+retry. Incremental/region journaling and lazy on-disk paging remain planned. The compact in-memory edit cache
 grows with edited chunks; the 8,192-chunk snapshot cap applies to retained edits.
 Palette compression may later replace runtime chunk arrays behind Chunk::get/set.
 Future format versions must explicitly describe block states, composite cells

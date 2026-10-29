@@ -10,8 +10,8 @@ item quantities and terrain edits. Local single-player remains available.
 From the repository root after building the default targets:
 
 ```sh
-./build/debug/bin/voxelcraft-server --world-dir worlds/friends --bind 0.0.0.0
-./build/debug/bin/voxelcraft --connect 127.0.0.1 --name Alice
+./build/debug/bin/voxelcraft-server --world-dir worlds/friends --bind 0.0.0.0 --auth-file /private/identities.txt
+./build/debug/bin/voxelcraft --connect 127.0.0.1 --name Alice --identity-file /private/alice.token
 ```
 
 Use the server's LAN address on another computer, for example
@@ -23,8 +23,11 @@ rejected. IPv6 endpoints with a port use brackets: `--connect '[::1]:25565'`.
 The default bind address is `127.0.0.1`, port 25565. `--bind 0.0.0.0` enables IPv4
 LAN connections. Configure the host's firewall as needed. The server supports
 eight connected players and 32 saved profiles. Names identify local/LAN profiles;
-there is no account authentication, encryption, permissions system or internet
-hosting service. Anyone who can connect can select a disconnected saved name.
+there is no account service, encryption, permissions system or internet hosting
+service. Profile-specific credentials can bind each persistent name to its owner.
+An external bind requires credentials or explicit `--trusted-lan`. Loopback without
+credentials is intended for local development; `--trusted-lan` permits profile name
+reuse by anyone on that trusted network and must not be used with untrusted peers.
 
 Create a survival world with:
 
@@ -99,8 +102,8 @@ burst. Malformed or slow peers disconnect without stopping the host. The network
 block palette is limited to 8,192 names. The limits bound transport memory but
 do not provide an internet-facing security guarantee.
 
-Terrain generation is asynchronous; lighting, meshing and snapshot I/O can still
-hitch. Player bodies do not physically collide and player-versus-player damage
+Terrain generation, mesh construction and snapshot I/O use bounded workers;
+lighting and snapshot capture can still hitch. Player bodies do not physically collide and player-versus-player damage
 is not implemented. Save/profile administration, chat, prediction, interpolation
 of creature animation between snapshots, bandwidth tuning, long-duration network
 soaks and human LAN playtesting remain follow-up work.
@@ -110,3 +113,43 @@ peers and survival transactions. Strict SDL/Vulkan tests cover visible avatars,
 custom textures, input intent and gameplay. See the
 [timed session record](development-session-five-hour-2026-10-29.md) for the latest
 executed build/test counts and limits.
+
+
+## Private-server identity (v0.8.1)
+
+Use protocol-3 clients and servers together. To protect existing profiles, create a
+private server file with one `NAME TOKEN` pair per line; names are case-insensitive.
+Use a distinct random 256-bit token for each player, encoded as 64 lowercase hex
+digits. Generate with `python3 -c 'import secrets; print(secrets.token_hex(32))'`
+or an equivalent cryptographic generator. Each player's `--identity-file` contains
+only their token. Send it privately and restrict credential file permissions.
+Credentials are read once at startup and never included in logs, Welcome packets,
+world snapshots, content fingerprints or mod state. They survive world upgrades
+independently; back up the server credential file separately. Restart with a
+changed token to revoke access. Authentication failure cannot create a profile or
+change its saved pose/items. Existing unlisted names are retained but cannot join
+until configured. Simultaneous duplicate names remain rejected.
+
+This is a practical private-server identity mechanism, **not secure public-internet
+hosting**. TCP transmits credentials without encryption and does not authenticate
+the server; use a trusted LAN or authenticated encrypted private tunnel. A network
+observer or impersonated endpoint can steal a token. `--trusted-lan` explicitly
+permits the old unauthenticated model and should only be used among trusted peers.
+Local loopback development also permits it; another local user can select a name.
+The credential file is not a general account database; there is no online account,
+password recovery or live reload. Do not expose it with the world or mod assets.
+
+Idle input stops movement after two simulation seconds and disconnects after 30;
+clients send heartbeats even while menus are open. TCP connection timeout is
+bounded, welcome timeout is 30 wall seconds, and an established client fails after
+15 wall seconds without any server packet. Hostname resolution still uses the OS
+synchronous resolver. Protocol mismatches produce a clear rejection. Clean server
+shutdown saves first, then attempts one bounded notification flush; a stalled peer
+cannot hold shutdown open. Reconnect by relaunching the client with the same name
+and identity file. Client mirroring is capped at 2,048 resident chunks, above the
+maximum ordinary streaming region; there is no unbounded remote allocation.
+
+Run `python3 tests/network_stress.py build/release/bin/voxelcraft-server --iterations 1000`
+for fragmented invalid-session stress, and `build/release/bin/vc_network_soak 1800`
+for eight authenticated clients, edits, reconnects, save cycles and restart checks.
+Only bounded runs recorded in the stabilization report have actually executed.

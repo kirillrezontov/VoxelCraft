@@ -10,10 +10,11 @@
 namespace vc {
 class Window;
 class Camera;
+struct RenderMetrics { double drawMilliseconds{},uploadMilliseconds{};std::size_t drawCalls{}; };
 struct ValidationReport { bool enabled{}; std::uint32_t errors{}, warnings{}; };
 class VulkanRenderer {
 public:
-    VulkanRenderer(Window& window, const ImageRgba& atlas, bool requireValidation = false);
+    VulkanRenderer(Window& window, const ImageRgba& atlas, bool requireValidation = false,bool vsync=true);
     ~VulkanRenderer();
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
@@ -29,6 +30,7 @@ public:
     void setModels(std::span<const Mesh> models);
     void setInstances(std::span<const RenderInstance> instances);
     std::size_t drawnInstanceCount() const;
+    RenderMetrics metrics() const;
     void requestResize();
     // Returns false when minimized or while recreating the swapchain.
     bool draw(const Camera& camera, const std::filesystem::path& screenshot = {});

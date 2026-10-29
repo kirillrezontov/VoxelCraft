@@ -22,6 +22,8 @@ Options parse(int argc,char** argv) {
         const std::string_view flag=argv[i];
         const auto value=[&]()->std::string_view { if(++i>=argc) throw std::invalid_argument("Missing value for "+std::string(flag));return argv[i]; };
         if(flag=="--world-dir") { directory=vc::utf8Path(value());worldSpecified=true;if(directory.empty()) throw std::invalid_argument("--world-dir must not be empty"); }
+        else if(flag=="--auth-file") options.host.profileTokens=vc::netgame::readProfileTokens(vc::utf8Path(value()));
+        else if(flag=="--trusted-lan") options.host.trustedLan=true;
         else if(flag=="--no-save") noSave=true;
         else if(flag=="--mods-dir") { options.host.modsDirectory=vc::utf8Path(value());modsSpecified=true;if(options.host.modsDirectory.empty()) throw std::invalid_argument("--mods-dir must not be empty"); }
         else if(flag=="--no-mods") noMods=true;
@@ -72,6 +74,7 @@ int run(const Options& options) {
         std::this_thread::sleep_until(next);
     }
     if(!saved) (void)host.save();
+    host.shutdown();
     vc::log("Server clean shutdown after "+std::to_string(completed)+" ticks");return 0;
 }
 }
@@ -82,6 +85,7 @@ int main(int argc,char** argv) {
             std::cout<<"VoxelCraft headless server " VC_VERSION_STRING "\n"
                 "--world-dir PATH --no-save --seed N --min-y N --max-y N --generator-version 1..3\n"
                 "--bind ADDRESS (default 127.0.0.1; use 0.0.0.0 for LAN) --port 0..65535 (default 25565)\n"
+                "--auth-file PATH (per-profile credentials) / --trusted-lan (unauthenticated private network)\n"
                 "--radius 1..6 --mods-dir PATH --no-mods --no-creatures --ticks N\n"
                 "--survival / --creative (saved mode resumes automatically)\n"
                 "60 Hz authoritative simulation. Ctrl-C/SIGTERM saves and stops.\n"

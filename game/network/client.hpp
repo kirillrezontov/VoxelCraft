@@ -7,7 +7,7 @@ namespace vc::netgame {
 // and rendering. Client input contains intent, never an authoritative position.
 class RemoteSession {
 public:
-    RemoteSession(std::string host,std::uint16_t port,std::string name,std::uint64_t fingerprint,voxel::BlockRegistry& blocks);
+    RemoteSession(std::string host,std::uint16_t port,std::string name,std::uint64_t fingerprint,voxel::BlockRegistry& blocks,std::string identityToken={});
     ~RemoteSession();
     RemoteSession(const RemoteSession&)=delete;
     RemoteSession& operator=(const RemoteSession&)=delete;
@@ -17,6 +17,8 @@ public:
     void inventory(const InventoryAction& action);
     void requestSave();
     void disconnect() noexcept;
+    std::uint64_t sentBytes() const;
+    std::uint64_t receivedBytes() const;
     bool open() const;
     const Welcome* welcome() const;
     const State& state() const;

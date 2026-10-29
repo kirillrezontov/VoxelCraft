@@ -31,6 +31,7 @@ std::optional<CompletedMesh> MeshWorker::takeReady() {
     auto result=std::move(ready_.front());ready_.pop_front();pending_.erase(result.position);return result;
 }
 std::size_t MeshWorker::pendingCount() const { std::lock_guard lock(mutex_);return pending_.size(); }
+WorkMetrics MeshWorker::metrics() const { std::lock_guard lock(mutex_);return metrics_; }
 void MeshWorker::run(std::stop_token stop) {
     try {
         while(!stop.stop_requested()) {
@@ -39,9 +40,10 @@ void MeshWorker::run(std::stop_token stop) {
                 std::unique_lock lock(mutex_);if(!wake_.wait(lock,stop,[this]{return !requests_.empty();})) return;
                 job.emplace(std::move(requests_.front()));requests_.pop_front();
             }
+            const auto started=std::chrono::steady_clock::now();
             auto mesh=meshChunk(*job->world.findChunk(job->position),job->world,registry_,atlas_,job->lighting?&*job->lighting:nullptr);
             if(stop.stop_requested()) return;
-            std::lock_guard lock(mutex_);ready_.push_back({job->position,job->ticket,std::move(mesh)});
+            std::lock_guard lock(mutex_);ready_.push_back({job->position,job->ticket,std::move(mesh)});metrics_.record(started);
         }
     } catch(...) { std::lock_guard lock(mutex_);failure_=std::current_exception(); }
 }

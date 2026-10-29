@@ -77,12 +77,16 @@ state together; the previous revision remains available. This avoids Windows's
 different behavior for replacing existing files and prevents partial multi-region
 updates. FNV-1a checksums detect accidental corruption; readers also validate sizes,
 counts, coordinates, identifiers, runs and versions. Checksums are not authentication.
-Files are closed before commit; explicit fsync/power-loss durability is not provided.
+Files are closed and synchronized before publication. POSIX syncs staging and
+parent directories around rename; Windows uses FlushFileBuffers and write-through
+publication. Device/filesystem durability guarantees still depend on the platform.
 
 The game owns the player's versioned binary payload. Storage treats it as bounded
-opaque game data and never depends on camera/gameplay types. Save/loading is
-synchronous; snapshots merge resident edits with evicted retained chunks and
-autosave can hitch. See
+opaque game data and never depends on camera/gameplay types. Loading is synchronous.
+A main-thread snapshot merges resident edits with evicted retained chunks; one
+bounded SnapshotWriter owns serialization and I/O. A completed result still counts
+against capacity until consumed. Shutdown explicitly awaits and reports save errors;
+destruction completes accepted work. Snapshot capture can still hitch. See
 [world-format](world-format.md) and [ADR 0005](decisions/0005-world-snapshots.md).
 
 ## Coordinate and matrix conventions
@@ -153,8 +157,11 @@ chunk dirty and, for changed boundary faces, resident face neighbors. Corner
 changes can invalidate four chunks, not diagonal neighbors. The client drains
 this set, remeshes those chunks, and passes replacements to the renderer by
 integer origin. Empty meshes remove GPU entries; formerly empty chunks add them.
-Existing buffers remain alive until the GPU is idle. Replacing whole affected
-chunk buffers synchronously is deliberate for this small v0.2 scene and can hitch.
+The single submitted frame fence covers all terrain/model/HUD references; buffer
+replacement waits for that fence, while swapchain recreation/shutdown still wait
+for the device/presentation. Owned neighbor/lighting snapshots are meshed on one
+bounded worker; revision tickets discard superseded edits, lighting and evictions.
+GPU allocation/upload remains on the main thread and can still hitch.
 
 Selection and crosshair geometry are small persistent GPU meshes. A push-constant
 flag selects vertex-color shading for those overlays; terrain samples the atlas.
@@ -327,3 +334,24 @@ payload v9, while retaining earlier formats and offline base-player state.
 The standalone host has no SDL/Vulkan dependency. Native socket/signal code stays
 in the platform layer. See [multiplayer](multiplayer.md) and
 [ADR0013](decisions/0013-authoritative-multiplayer.md).
+
+
+## v0.8.1 stabilization decisions
+
+Opaque full-cube faces use slice masks keyed by block ID and face illumination.
+Masks are allocated only for visible slices; compatible rectangles merge without
+crossing material/light boundaries. Vertices carry optional atlas bounds and local
+repeat coordinates, so the fragment shader repeats each 16² tile with its original
+orientation. Transparent and non-opaque cubes keep their existing unit-face path.
+The original culled mesher remains selectable for equivalence tests/benchmarks.
+Non-cubic geometry does not exist yet and requires its own future specialized path.
+Chunk arrays stay at 65,536 bytes; a palette rewrite is deferred. Save format and
+modding API are unchanged. See [ADR0014](decisions/0014-stabilization.md).
+
+Protocol 3 adds an optional private profile credential to Hello. Host validates it
+before selecting/creating a profile; credentials live in operator-owned files,
+never world payloads. External unauthenticated binds require explicit trust opt-in.
+A single server thread owns world/player/mod/simulation state; network clients
+send only validated intent/transactions. Platform file sync and Windows UTF-8
+process configuration remain outside gameplay. CPack installs separate Client and
+Server components, with detected redistributables, licenses and compiled shaders.

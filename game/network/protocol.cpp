@@ -1,4 +1,5 @@
 #include "game/network/protocol.hpp"
+#include "game/network/identity.hpp"
 #include "game/simulation/day_cycle.hpp"
 #include <algorithm>
 #include <cmath>
@@ -119,11 +120,16 @@ std::uint64_t contentFingerprint(const voxel::BlockRegistry& blocks,const ItemRe
 }
 binary::Bytes encode(const Hello& message) {
     if(!validPlayerName(message.name)) throw std::invalid_argument("Invalid joining player name");
-    auto out=packet(Message::Hello);out.raw("VCNET");out.u32(protocolVersion);out.u64(message.fingerprint);out.text(message.name);return out.bytes;
+    auto out=packet(Message::Hello);out.raw("VCNET");out.u32(protocolVersion);out.u64(message.fingerprint);out.text(message.name);
+    if(!message.identityToken.empty()&&!validIdentityToken(message.identityToken)) throw std::invalid_argument("Invalid identity token format");
+    out.text(message.identityToken);return out.bytes;
 }
 Hello decodeHello(std::span<const std::uint8_t> bytes) {
     auto in=reader(bytes,Message::Hello);in.magic("VCNET");if(in.u32()!=protocolVersion) throw std::runtime_error("Unsupported multiplayer protocol version");
-    Hello message;message.fingerprint=in.u64();message.name=in.text();in.finish();if(!validPlayerName(message.name)) throw std::runtime_error("Invalid joining player name");return message;
+    Hello message;message.fingerprint=in.u64();message.name=in.text();message.identityToken=in.text();in.finish();
+    if(!message.identityToken.empty()&&!validIdentityToken(message.identityToken)) throw std::runtime_error("Invalid identity token format");
+    if(!validPlayerName(message.name)) throw std::runtime_error("Invalid joining player name");
+    return message;
 }
 binary::Bytes encode(const Welcome& message) {
     validWelcome(message);auto out=packet(Message::Welcome);out.raw("VCNET");out.u32(protocolVersion);out.u64(message.id);out.u64(message.tick);
@@ -223,11 +229,11 @@ ChunkUpdate decodeChunk(std::span<const std::uint8_t> bytes,std::span<const voxe
 binary::Bytes encodeUnload(voxel::Position chunk) { auto out=packet(Message::Unload);position(out,chunk);return out.bytes; }
 voxel::Position decodeUnload(std::span<const std::uint8_t> bytes) { auto in=reader(bytes,Message::Unload);const auto p=position(in);in.finish();return p; }
 binary::Bytes encodeText(Message type,std::string_view text) {
-    if((type!=Message::Notice&&type!=Message::Reject)||text.size()>240) throw std::invalid_argument("Invalid network notice");
+    if((type!=Message::Notice&&type!=Message::Reject&&type!=Message::Goodbye)||text.size()>240) throw std::invalid_argument("Invalid network notice");
     auto out=packet(type);out.text(text);return out.bytes;
 }
 std::string decodeText(std::span<const std::uint8_t> bytes,Message type) {
-    if(type!=Message::Notice&&type!=Message::Reject) throw std::invalid_argument("Invalid network notice type");
+    if(type!=Message::Notice&&type!=Message::Reject&&type!=Message::Goodbye) throw std::invalid_argument("Invalid network notice type");
     auto in=reader(bytes,type);auto text=in.text();in.finish();if(text.size()>240) throw std::runtime_error("Network notice exceeds limit");return text;
 }
 binary::Bytes encodeControl(Message type) {

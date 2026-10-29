@@ -12,6 +12,8 @@ struct Options {
     std::string connectHost,playerName{"Player"};
     std::uint16_t connectPort{25565};
     vc::voxel::WorldBounds bounds;
+    int width{1280},height{720};
+    bool fullscreen{},vsync{true};
     unsigned frameLimit{};
     bool smoke{}, help{}, requireValidation{}, fly{}, noSave{}, seedSpecified{}, minSpecified{}, maxSpecified{},noSettings{};
     std::optional<double> fieldOfView,mouseSensitivity;
@@ -20,7 +22,7 @@ struct Options {
     std::optional<std::uint32_t> generatorVersion;
     std::optional<double> timeOfDay;
     bool freezeTime{},noMods{};
-    std::filesystem::path screenshot, worldDirectory,settingsFile,modsDirectory;
+    std::filesystem::path screenshot, worldDirectory,settingsFile,modsDirectory,identityFile;
 };
 Options parseOptions(int argc,char** argv);
 }

@@ -12,7 +12,7 @@ void equal(const vc::Mesh& actual,const vc::Mesh& expected) {
     for(std::size_t i=0;i<actual.vertices.size();++i) {
         const auto& a=actual.vertices[i];const auto& b=expected.vertices[i];
         ASSERT_EQ(a.position,b.position);ASSERT_EQ(a.color,b.color);ASSERT_EQ(a.uv,b.uv);ASSERT_EQ(a.normal,b.normal);
-        ASSERT_EQ(a.opacity,b.opacity);ASSERT_EQ(a.light,b.light);ASSERT_EQ(a.sway,b.sway);
+        ASSERT_EQ(a.opacity,b.opacity);ASSERT_EQ(a.light,b.light);ASSERT_EQ(a.sway,b.sway);ASSERT_EQ(a.tileBounds,b.tileBounds);
     }
 }
 std::optional<vc::voxel::CompletedMesh> await(vc::voxel::MeshWorker& worker) {

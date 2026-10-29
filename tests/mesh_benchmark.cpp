@@ -36,6 +36,18 @@ int main() {
         World world;const Position player{0,40,0};const auto positions=streamingRegion(player,{},2,3);
         for(const auto p:positions) world.insert(generator.generate(p));
         Lighting lighting;const auto dirty=world.takeDirtyChunks();(void)lighting.refresh(world,blocks,dirty);
+        Measurement culled,greedy;
+        for(const bool merge:{false,true}) {
+            auto& measured=merge?greedy:culled;const auto runStart=Clock::now();
+            for(const auto& [position,chunk]:world.chunks()) {
+                (void)position;const auto before=Clock::now();
+                const auto mesh=meshChunk(chunk,world,blocks,atlas,&lighting,merge);
+                measured.calls.push_back(milliseconds(Clock::now()-before));measured.add(std::span(&mesh,1));
+            }
+            measured.wall=milliseconds(Clock::now()-runStart);
+        }
+        std::cout<<std::fixed<<std::setprecision(3);culled.report("Unit faces (reference)");greedy.report("Greedy opaque faces");
+        std::cout<<"Chunk cell payload "<<chunkVolume*sizeof(BlockId)<<" bytes; Vertex "<<sizeof(vc::Vertex)<<" bytes.\n";
         Measurement synchronous,background;ChunkMeshQueue direct;direct.invalidate(positions);auto start=Clock::now();
         while(direct.pendingCount()) {
             const auto before=Clock::now();const auto meshes=direct.rebuild(world,blocks,atlas,player,2,&lighting);
