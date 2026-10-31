@@ -107,6 +107,11 @@ int main(int argc,char** argv) {
         // Same remote lifecycle can be cancelled while waiting for the handshake.
         app.startRemote(remote);networkTick();app.requestLeave();
         until([&] { return !app.hasSession()&&server.playerCount()==0; },networkTick);
+        auto mismatch=remote;mismatch.noMods=false;mismatch.modsDirectory=vc::utf8Path(argv[2]);
+        app.startRemote(mismatch);until([&] { return !app.hasSession(); },networkTick);
+        require(app.screen()==vc::client::ApplicationScreen::Error&&server.playerCount()==0,"Rejected handshake did not leave a recoverable error");
+        vc::Input back;back.closeUi=true;app.frame(back);
+        require(app.screen()==vc::client::ApplicationScreen::MainMenu,"Error back navigation failed");
         tick();until([&] { return app.renderer().draw(vc::Camera{},captures/"returned-menu.ppm"); },tick);
         app.shutdown();const auto validation=app.validationReport();
         require(validation.enabled&&validation.errors==0&&validation.warnings==0,"Session lifecycle Vulkan validation failed");
