@@ -1,4 +1,4 @@
-#include "client/network_client.hpp"
+#include "client/session_environment.hpp"
 #include "client/preferences.hpp"
 #include "engine/core/log.hpp"
 #include "engine/platform/window.hpp"
@@ -31,29 +31,25 @@ voxel::Position cell(glm::dvec3 p) {
     return {static_cast<std::int64_t>(std::floor(p.x)),static_cast<std::int64_t>(std::floor(p.y)),static_cast<std::int64_t>(std::floor(p.z))};
 }
 struct Avatar { glm::dvec3 position{};double phase{};bool initialized{}; };
-void shutdown(VulkanRenderer& renderer) {
-    renderer.shutdown();const auto validation=renderer.validationReport();
-    if(validation.enabled) {
-        log("Vulkan validation: "+std::to_string(validation.errors)+" errors, "+std::to_string(validation.warnings)+" warnings (including shutdown)");
-        if(validation.errors) throw std::runtime_error("Network client Vulkan validation failed");
-    }
 }
-}
-int runRemote(const Options& options) {
-    Window window(options.width,options.height,options.fullscreen);const auto preferences=loadPreferences(options);auto directory=options.modsDirectory;
+GameSession remoteSession(SessionEnvironment& host,Options options) {
+    if(host.quitRequested) co_return SessionExit::Quit;
+    if(host.leaveRequested) co_return SessionExit::Menu;
+    auto& window=host.window;auto& renderer=host.renderer;const auto& preferences=host.preferences;auto directory=options.modsDirectory;
     if(directory.empty()&&!options.noMods&&!options.frameLimit) directory=Window::userDataPath()/"mods";
     ContentServices content(directory);auto& blocks=content.blocks();auto& mods=content.mods();const auto atlas=mods.atlas().layout();
     auto& items=content.items();auto& recipes=content.recipes();auto& mining=content.mining();
     const auto fingerprint=netgame::contentFingerprint(blocks,items,recipes,mining,mods);
-    VulkanRenderer renderer(window,mods.atlas().image(),options.requireValidation,options.vsync);
+    renderer.replaceAtlas(mods.atlas().image());
     netgame::RemoteSession session(options.connectHost,options.connectPort,options.playerName,fingerprint,blocks,options.identityFile.empty()?std::string{}:netgame::readIdentityToken(options.identityFile));
     log("Connecting to "+options.connectHost+':'+std::to_string(options.connectPort)+" as "+options.playerName);
     while(!session.welcome()) {
-        const auto input=window.poll();if(input.quit) { session.disconnect();shutdown(renderer);return options.frameLimit?1:0; }
+        const auto input=(co_await host.nextFrame());if(input.quit||host.quitRequested) { session.disconnect();co_return SessionExit::Quit; }
+        if(input.closeUi||input.pause||host.leaveRequested) { session.disconnect();co_return SessionExit::Menu; }
         if(input.resized) renderer.requestResize();
         session.pump();
         if(!session.open()) throw std::runtime_error("Server closed during handshake");
-        window.title("VoxelCraft: connecting to server");renderer.draw(Camera{});
+        window.title("VoxelCraft: connecting to server");host.draw(Camera{});
     }
     const auto welcome=*session.welcome();log("Connected as "+welcome.profile.name+" (player "+std::to_string(welcome.id)+")");
     bool survivalMode=welcome.survival;
@@ -73,13 +69,14 @@ int runRemote(const Options& options) {
     auto knownItems=welcome.profile.items;
     double last=Window::seconds(),diagnostic=last,lastSent=last-1,waitingSince=last;unsigned frames=0,diagnosticFrames=0;
     std::uint64_t stateTick=welcome.tick;std::uint32_t actions=options.fly&&!welcome.profile.flying?netgame::ToggleFlight:0u;
-    bool capturedScreenshot=false,quitWithoutSaving=false,everReady=false;
+    bool capturedScreenshot=false,quitWithoutSaving=false,everReady=false,exitApplication=false;
+    host.screens.show(ApplicationScreen::Gameplay);
     const auto notify=[&](std::string message) { ui.status(std::move(message),Window::seconds()); };
     notify("CONNECTED AS "+welcome.profile.name);window.pointerMode(false);window.capture(true);
     bool consoleCaptureBefore=true;
     for(;;) {
+        auto input=(co_await host.nextFrame());if(input.quit||host.quitRequested||host.leaveRequested) { quitWithoutSaving=input.quitWithoutSaving;exitApplication=input.quit||host.quitRequested;host.leaveRequested=false;break; }
         const auto updateStart=Window::seconds();
-        auto input=window.poll();if(input.quit) { quitWithoutSaving=input.quitWithoutSaving;break; }
         if(input.resized) renderer.requestResize();
         session.pump();
         if(!session.open()) throw std::runtime_error("Server disconnected");
@@ -125,11 +122,13 @@ int runRemote(const Options& options) {
         window.textInput(ui.wantsTextInput());window.pointerMode(ui.open());
         if(auto clipboard=ui.takeClipboard();!clipboard.empty()) window.clipboard(clipboard);
         for(const auto& command:ui.takeCommands()) session.command(command);
+        if(ui.takeLeaveRequested()) { host.leaveRequested=true;continue; }
         if(ui.takeSaveRequested()) session.requestSave();
         camera.fieldOfView=static_cast<float>(ui.settings().fieldOfView);camera.mouseSensitivity=ui.settings().mouseSensitivity;camera.invertY=ui.settings().invertY;
         if(ui.takeSettingsChanged()) {
+            host.preferences.settings=ui.settings();
             if(preferences.path.empty()) notify("SETTINGS APPLY FOR THIS SESSION");
-            else { try { saveSettings(preferences.path,ui.settings());notify("SETTINGS SAVED"); } catch(const std::exception& error) { log(error.what());notify("SETTINGS SAVE FAILED"); } }
+            else { try { host.applySettings(ui.settings());notify("SETTINGS SAVED"); } catch(const std::exception& error) { log(error.what());notify("SETTINGS SAVE FAILED"); } }
         }
         const bool active=input.captured&&!ui.open();
         if(active) camera.update({0,0,0,input.mouseX,input.mouseY},delta);
@@ -192,7 +191,7 @@ int runRemote(const Options& options) {
         if(auto hud=ui.rebuild(blocks,atlas,width,height,now)) renderer.setHud(hud->colored,hud->textured,!ui.open(),hud->foreground);
         const auto updateMilliseconds=(Window::seconds()-updateStart)*1000;
         const bool capture=!capturedScreenshot&&!options.screenshot.empty()&&everReady&&frames>=(options.frameLimit?options.frameLimit-1:60);
-        if(renderer.draw(camera,capture?options.screenshot:std::filesystem::path{})) {
+        if(host.draw(camera,capture?options.screenshot:std::filesystem::path{})) {
             if(everReady) { ++frames;++diagnosticFrames; }if(capture) capturedScreenshot=true;
         } else Window::idle();
         if(now-diagnostic>=1) {
@@ -211,6 +210,6 @@ int runRemote(const Options& options) {
     if(options.frameLimit&&frames<options.frameLimit) throw std::runtime_error("Network bounded run interrupted");
     if(!options.screenshot.empty()&&!capturedScreenshot) throw std::runtime_error("Network screenshot was not captured");
     log("Network client rendered "+std::to_string(frames)+" frames; received terrain and "+std::to_string(session.state().players.size())+" players");
-    shutdown(renderer);return 0;
+    co_return options.frameLimit?SessionExit::Completed:exitApplication?SessionExit::Quit:SessionExit::Menu;
 }
 }

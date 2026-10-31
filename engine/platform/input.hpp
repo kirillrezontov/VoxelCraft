@@ -30,6 +30,7 @@ public:
     bool textInput() const { return textInput_; }
     bool captured() const { return captured_; }
     Input consume();
+    void reset() { resetActions(); }
 private:
     void resetActions();
     bool captured_{}, leftHeld_{}, rightHeld_{};

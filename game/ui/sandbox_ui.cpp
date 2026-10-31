@@ -69,7 +69,7 @@ void SandboxUiController::layoutWidgets(int width,int height) {
     if(screen_==UiScreen::Settings) {
         for(std::size_t i=0;i<9;++i) add("setting"+std::to_string(i),ui::WidgetKind::Button,l.settingsButton(i));
     } else if(screen_==UiScreen::Pause) {
-        for(std::size_t i=0;i<3;++i) add("pause"+std::to_string(i),ui::WidgetKind::Button,l.pauseButton(i));
+        for(std::size_t i=0;i<4;++i) add("pause"+std::to_string(i),ui::WidgetKind::Button,l.pauseButton(i));
     } else if(screen_==UiScreen::Inventory||screen_==UiScreen::Crafting) {
         const auto tip=[&](const ItemDefinition& item,const ItemStack* stack=nullptr) {
             auto value=item.presentation.name+"\n"+item.identifier;
@@ -133,7 +133,8 @@ void SandboxUiController::activate(std::string_view id,const SandboxUiInput& inp
     } else if(id.starts_with("pause")) {
         const auto i=index("pause");if(i==0) closeMenus();
         else if(i==1) { settingsReturn_=UiScreen::Pause;screen_=UiScreen::Settings;dirty_=true; }
-        else { saveRequested_=true;status("Save requested",now_); }
+        else if(i==2) { saveRequested_=true;status("Save requested",now_); }
+        else leaveRequested_=true;
     } else if(id.starts_with("slot")) {
         const auto i=index("slot");if(i>=36) return;
         if(!survival_) {

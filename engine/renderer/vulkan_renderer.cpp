@@ -799,6 +799,17 @@ ValidationReport VulkanRenderer::validationReport() const {
     return {validation_->enabled, validation_->errors.load(), validation_->warnings.load()};
 }
 void VulkanRenderer::requestResize() { impl_->dirty = true; }
+void VulkanRenderer::replaceAtlas(const ImageRgba& image) {
+    image.validate();
+    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX),"Wait before atlas replacement");
+    auto texture=impl_->createTexture(image);
+    impl_->updateTextureDescriptor(0,*texture);
+    impl_->atlasTexture=std::move(texture);
+}
+void VulkanRenderer::clearSession() {
+    upload({});setInstances({});setModels({});setHud({}, {}, false);
+    setSelection(std::nullopt);setProgressIndicator(std::nullopt);setAtmosphere(Atmosphere{});
+}
 RenderMetrics VulkanRenderer::metrics() const { return impl_->metrics; }
 bool VulkanRenderer::draw(const Camera& camera, const std::filesystem::path& screenshot) {
     const auto start=std::chrono::steady_clock::now();impl_->metrics.drawCalls=0;

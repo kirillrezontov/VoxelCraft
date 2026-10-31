@@ -185,7 +185,7 @@ void drawSettings(Painter& p,const SandboxUiLayout& l,const GameSettings& settin
 }
 void drawPause(Painter& p,const SandboxUiLayout& l,const SandboxUiView* view) {
     heading(p,l,"Paused","Single player pauses simulation  ·  Multiplayer keeps running");
-    for(std::size_t i=0;i<3;++i) p.button(l.pauseButton(i),std::array<std::string_view,3>{"Resume","Settings","Save world"}[i],"pause"+std::to_string(i),view);
+    for(std::size_t i=0;i<4;++i) p.button(l.pauseButton(i),std::array<std::string_view,4>{"Resume","Settings","Save world","Return to main menu"}[i],"pause"+std::to_string(i),view);
 }
 void drawConsole(Painter& p,const SandboxUiLayout& l,const SandboxUiView& view) {
     const auto& theme=p.theme;
