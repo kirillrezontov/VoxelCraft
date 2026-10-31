@@ -15,6 +15,9 @@ release. See the [implementation/test record](docs/v0.8.2-implementation.md),
 [command reference](docs/v0.8.2-commands.md), [UI guide](docs/v0.8.2-ui-design.md)
 and [release notes](docs/v0.8.2-release-notes.md).
 
+The [baseline recovery record](docs/baseline-recovery.md) documents the original
+files omitted from earlier commits, their provenance and clean-checkout checks.
+
 
 Implemented: seeded procedural grass/dirt/stone terrain, compact 32³ chunks,
 neighbor-aware cube meshing, textured rendering with depth testing, a

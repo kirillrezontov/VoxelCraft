@@ -1,0 +1,431 @@
+{
+  "baseline_commit": "692aef6066641393fd3ce17c2890b94177544ab6",
+  "investigation": {
+    "reachable_baseline_commits": 4,
+    "other_local_branches": 0,
+    "stashes": 0,
+    "additional_worktrees": 0,
+    "unreachable_objects": 0,
+    "missing_paths_found_in_local_working_tree": 33,
+    "missing_paths_found_in_reachable_baseline_trees": 0
+  },
+  "files": [
+    {
+      "path": "assets/fonts/DejaVuSans.ttf",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "6038a160b491e121c1f12c7bccb4a9c8730296e3adc1086a059404ed84b7451c",
+      "recovery_commit": "dc7480f9c511258588720cf4e19b4b94d3280c3c"
+    },
+    {
+      "path": "assets/fonts/DejaVuSansMono.ttf",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "b5babc084554ebdd142fe099d8b7c573ff161738bca913723d3e84f5c3df1c78",
+      "recovery_commit": "dc7480f9c511258588720cf4e19b4b94d3280c3c"
+    },
+    {
+      "path": "assets/fonts/LICENSE-DejaVu.txt",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "7a083b136e64d064794c3419751e5c7dd10d2f64c108fe5ba161eae5e5958a93",
+      "recovery_commit": "dc7480f9c511258588720cf4e19b4b94d3280c3c"
+    },
+    {
+      "path": "third_party/stb/README.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "3f63909d97cc2b227761ccaa715c509df015d533585d594ad02095a67e26553e",
+      "recovery_commit": "dc7480f9c511258588720cf4e19b4b94d3280c3c"
+    },
+    {
+      "path": "third_party/stb/stb_truetype.h",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "a34d8d536ce7c11b9163ab2d524721c1f4df1452cce6595c4f11d3048384f925",
+      "recovery_commit": "dc7480f9c511258588720cf4e19b4b94d3280c3c"
+    },
+    {
+      "path": "cmake/font_data.cpp.in",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "2899813dc541f4c9c6ec35dfb491b8f897cb6564a68ce522e5b729ce7d2d8227",
+      "recovery_commit": "dc7480f9c511258588720cf4e19b4b94d3280c3c"
+    },
+    {
+      "path": "engine/core/content_presentation.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "a0e4c7e08ded77d8c8eee68422bc64273afdf99fa67d9a88f9a221282283e41a",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/core/content_presentation.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "d3749182af27a64db715cfd6218cb79a2d1fc7c18c403c1c1ee049828f1761ae",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/core/utf8.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "d68a5844b9768a65e584184d9cbecc10728edc199bb85244679aebc618fec577",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/core/utf8.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "8929cc89b2305c6c6e44a8036e48d179a3e6b1635188a4178f75df2481d780e6",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/core/work_metrics.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "2c470d3312160601a9f02b76e1f73d300d5bff5c7aa2aea13e04b0b1724a354f",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/platform/console_input.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "74708d13977e64dfd235d5ee550fc439b68eccbbb4e784f7260cd9f95cc9643c",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/platform/console_input.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "7979b18ea5bdbdd54638600eb2074310468017b1889845911f2122e0bd39ef7c",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/platform/file_sync.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "2591019d2de8ce56c524f32236c42312e1f603f02910370bd06f7350fa8cf9d2",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/platform/file_sync.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "2e764aaaeaf3563aeeb669499e1653628709145e9eb037280d0b0bbb9757667d",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/ui/font.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "325bebfc4ab1156e06190b2030c89460e729807e9df129ce7705786b69ea361a",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/ui/font.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "68a424612776766287c989bdcb9da03a638c1cd2591a08e3583bb3a1c7c59f09",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/ui/text_edit.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "a21e19cb163fecb7896bcd203991f860c0e9233a0b4e454b3d7ee6d83763c7d4",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/ui/text_edit.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "2e1cf0ebe1afd5df0cc833470f5337b67097336789358ae533efed5a61bbbee8",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/ui/widgets.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "5feb13a3070a755df77d6ad10e767b125f062d296eb7e9e94ada41857cd9a7d1",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "engine/ui/widgets.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "997d3405370ca8c67bb7817487211fca5c1e0e608592c81c9bb56e492c520466",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/commands/commands.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "f4e56dc700f62038b6452be26b54cc6af08d4b9fb8885d9243d4aa32200bdb7f",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/commands/commands.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "fa49db91a486f240de956d59d75bb85e87e7f669fcb0b8ea1ac3d4674619005d",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/commands/parser.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "3013dbefc5ac0f98c478a4aba1384aceddf341ed53c77d38d4cb77dc4a51d7d1",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/commands/permissions.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "3c79bac5f4d38ae52616264a92649fa77138150c4516b3eacacbb84c4243f06e",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/commands/permissions.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "dccf0df98a1cdd25c4a62cea18b35acdede4bc2d3329478a5882cb8afffb9324",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/network/identity.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "60ef4efd1557325b1ebd09358650d1defd0074449379210375d7bdec54139f0d",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/network/identity.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "2e2e6bd7ea139b444cd2f0fd126a22ddd183db82a89970a06eaacc3118894b52",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/ui/console.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "f1c5294a7d90f4e5592924346b96969285802e6e2442502a0a092ab3317e07ff",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/ui/console.hpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "ae0118e3d7bb7ff5683bad9bd656145b79095338d1a6c4c158cfc08be00ebd6f",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "game/ui/sandbox_views.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "d191a7080cfd2e13b762b379824f5d2c35587fed3941c0fa8f547eaaed311a9b",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "tests/command_tests.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "bf11578b0e6654b45c18a2edc19ed3f8cd2caeedb66a5dd137308ef92cfc0873",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "tests/console_playtest.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "395ed9c3540942703960fe6a6b046cab1d3a0e093c83d45934ed5b8ebca47ead",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "tests/greedy_mesh_tests.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "b092e753cd24f7207e96cc04bb2082d17787703ef96fc046a62eff4163a63df7",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": "tests/ui_core_tests.cpp",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "7dfc6b230a8ef07aa139343de73e6fe51d6695017dc5b7efcf3faf2b6ee72c60",
+      "recovery_commit": "4feda33eb752e38079d64ed5e3278fb5d358606f"
+    },
+    {
+      "path": ".github/workflows/vulkan-smoke.yml",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "7dfb261343aee27e37556604f5196dffa888547d8dde9a31a94dfcf697774d04",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "cmake/Packaging.cmake",
+      "missing_33": true,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "ca79d3db5f15436f35f2233ed2cd3ab2d88d7a260bf9ccd1a578958053839228",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "cmake/windows-utf8.manifest",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "ae18e973ee276ee777cf40fa0ccf4c73e23ec0280d3abd4bca39f205145ebf9a",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/decisions/0014-stabilization.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "b34dfa20b19fa716cc055fbd43c9f4ef6523f7c3425bd8edcd618c38595dffee",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/release-v0.8.1-test-plan.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "c9fd1c6cb8a882c3da6753d68b5c22700632eea4c9cf118cceb256e55540f1fa",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/v0.8.1-release-notes.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "ea5546144023986f4c9d382b9cbc851a6bd961e3990a855c7476c4a4f407792e",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/v0.8.1-stabilization.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "977dc0fca40dc785d7298ace8983378695d8d117a1cfe0ba32c1fc5b5a3aecee",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/v0.8.2-commands.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "bc5f3425706005ff963e6df6f987f64c669a52b5b2137f958167ff4ef9d5788b",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/v0.8.2-implementation.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "86a0c19a1e3aacdc68b80e7a2cbc3138eff34b07b3161dbead564457fce39d7d",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/v0.8.2-release-notes.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "d2e544c7857fb9352db61061fe46c13230694024aa599bd7495fad1bddf97173",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/v0.8.2-ui-design.md",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "27c817c35c47a8d8f5bb157e4664978e09d433cd325cf4d74ca3f804dfcd28e7",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/voxelcraft-v082-console.png",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "a0ba25da241a6a8c1205aa0cf906fee7d79850be6de4d8bb720a13b047a69e88",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "docs/voxelcraft-v082-inventory.png",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "91fa20b127b0d424750d25d1474d8650c488f668d5bffe88f4a0d9e595a01282",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "packaging/README.txt",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "2378fdc6503414ccc62438963a570d8a1deec015620c61895565744359805d26",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "packaging/licenses/GCC-Runtime-Library-Exception.txt",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "9d6b43ce4d8de0c878bf16b54d8e7a10d9bd42b75178153e3af6a815bdc90f74",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "packaging/licenses/GPL-3.0.txt",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "packaging/licenses/THIRD-PARTY.txt",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "bede12b7806b90b9d6cd4eb6b6d9061a31dcce22bc261005cebc5ca8ff4113bb",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "tests/network_stress.py",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "8a0f72d0c33a5bc6e73cf5952a090e1693198af560987e92fa906276cc13b362",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    },
+    {
+      "path": "tests/package_smoke.py",
+      "missing_33": false,
+      "origin": "pre-existing local untracked file; preserved byte-for-byte",
+      "original_sha256": "1170af3d0f1567e54d4c7cd39c69b504539a1822c09c251596807961554315fc",
+      "recovery_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba"
+    }
+  ],
+  "preserved_untracked_task_notes": [
+    ".codex/tasks/stabilization-0.8.1.md",
+    ".codex/tasks/v0.8.2-ui-console.md"
+  ],
+  "missing_33": [
+    "assets/fonts/DejaVuSans.ttf",
+    "assets/fonts/DejaVuSansMono.ttf",
+    "cmake/Packaging.cmake",
+    "cmake/font_data.cpp.in",
+    "engine/core/content_presentation.cpp",
+    "engine/core/content_presentation.hpp",
+    "engine/core/utf8.cpp",
+    "engine/core/utf8.hpp",
+    "engine/core/work_metrics.hpp",
+    "engine/platform/console_input.cpp",
+    "engine/platform/console_input.hpp",
+    "engine/platform/file_sync.cpp",
+    "engine/platform/file_sync.hpp",
+    "engine/ui/font.cpp",
+    "engine/ui/font.hpp",
+    "engine/ui/text_edit.cpp",
+    "engine/ui/text_edit.hpp",
+    "engine/ui/widgets.cpp",
+    "engine/ui/widgets.hpp",
+    "game/commands/commands.cpp",
+    "game/commands/commands.hpp",
+    "game/commands/parser.cpp",
+    "game/commands/permissions.cpp",
+    "game/commands/permissions.hpp",
+    "game/network/identity.cpp",
+    "game/network/identity.hpp",
+    "game/ui/console.cpp",
+    "game/ui/console.hpp",
+    "game/ui/sandbox_views.cpp",
+    "tests/command_tests.cpp",
+    "tests/console_playtest.cpp",
+    "tests/greedy_mesh_tests.cpp",
+    "tests/ui_core_tests.cpp"
+  ]
+}

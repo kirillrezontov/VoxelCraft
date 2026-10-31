@@ -1,0 +1,23 @@
+VoxelCraft dependency notices
+
+SDL 3.2.10: zlib license. Additional SDL component notices accompany SDL sources.
+GLM 1.0.1: MIT or modified MIT, see GLM.txt.
+EnTT 3.14.0: MIT, see EnTT.txt.
+Lua 5.4.9: MIT, see Lua.html.
+nlohmann/json 3.12.0: MIT, see JSON.txt.
+stb_image commit 013ac3beddff3dbffafd5177e7972067cd2b5083: MIT or public domain,
+see stb_image.txt.
+Vulkan loader and graphics drivers are provided by the operating system/vendor.
+GoogleTest is used for development only and is not included in release archives.
+
+Bundled GNU libstdc++/libgcc runtimes: GPL version 3 with GCC Runtime Library
+Exception 3.1 (both texts included). Source and corresponding releases are at
+https://gcc.gnu.org/releases.html and https://gcc.gnu.org/git.html . Runtime
+versions match the compiler used to build each archive; consult build records.
+MSVC redistributables, when present, are Microsoft's redistributable runtime
+components, located by CMake InstallRequiredSystemLibraries.
+
+DejaVu Sans and DejaVu Sans Mono: redistributed with the DejaVu/Bitstream notices
+in DejaVu.txt and assets/fonts/LICENSE-DejaVu.txt (client).
+stb_truetype at the same pinned stb commit: MIT/public domain alternatives,
+see stb_truetype.txt. Builtin item icons are original procedural VoxelCraft artwork.

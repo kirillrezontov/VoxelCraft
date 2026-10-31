@@ -19,6 +19,8 @@
 - [ ] Windows/MSVC execution and sustained human cross-platform playtesting (unverified locally)
 
 Detailed task coverage and acceptance evidence: [v0.8.2 implementation record](docs/v0.8.2-implementation.md).
+Repository completeness and clean-checkout evidence are recorded separately in
+the [baseline recovery record](docs/baseline-recovery.md).
 Weather and full Lua command registration are optional, explicitly deferred.
 
 ## v0.8.1 — Stabilization (historical release-candidate foundation)

@@ -1,0 +1,138 @@
+{
+  "date": "2026-10-31",
+  "verified_source_commit": "53a157c4b66a0317cfc5efd637fbe3b237f3f0ba",
+  "source_provenance": "fresh independent local Git clone containing committed recovery files only",
+  "fresh_default_fetchcontent_configure": {
+    "exit_code": 0,
+    "compiler": "GCC 16.2.1",
+    "cmake": "4.4.3",
+    "generator": "Ninja",
+    "build_type": "Debug",
+    "options": {
+      "VC_ENABLE_GPU_TESTS": "ON",
+      "VC_BUILD_SOAK_TOOLS": "ON",
+      "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+    },
+    "source_overrides": false,
+    "original_build_caches_used": false
+  },
+  "builds": {
+    "gcc_debug_all_targets": {
+      "exit_code": 0,
+      "ninja_steps": 543
+    },
+    "clang_asan_ubsan_headless": {
+      "exit_code": 0,
+      "ninja_steps": 155
+    },
+    "clang_tsan_headless": {
+      "exit_code": 0,
+      "ninja_steps": 155
+    }
+  },
+  "sanitizer_configuration": {
+    "compiler": "Clang 22.1.8",
+    "VC_BUILD_CLIENT": "OFF",
+    "dependency_sources": "same pristine pinned third-party sources downloaded by the fresh Debug configure; independent compiled outputs",
+    "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1",
+    "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1",
+    "TSAN_OPTIONS": "halt_on_error=1",
+    "tsan_filter": "^(TerrainWorker|MeshWorker|BackgroundMeshing|SnapshotWriter)\\."
+  },
+  "ctest": {
+    "cpu-debug": {
+      "tests": 211,
+      "failures": 0,
+      "disabled": 0,
+      "skipped": 0
+    },
+    "graphics-debug": {
+      "tests": 12,
+      "failures": 0,
+      "disabled": 0,
+      "skipped": 0
+    },
+    "asan": {
+      "tests": 192,
+      "failures": 0,
+      "disabled": 0,
+      "skipped": 0
+    },
+    "tsan": {
+      "tests": 11,
+      "failures": 0,
+      "disabled": 0,
+      "skipped": 0
+    }
+  },
+  "graphics_environment": {
+    "display": "private KWin virtual Wayland compositor, private D-Bus/runtime/config/data/cache directories",
+    "gpu": "AMD Radeon Graphics (RADV RENOIR)",
+    "driver": "Mesa 26.2.2-arch3.2",
+    "vulkan_api": "1.4.354",
+    "validation_layer": "VK_LAYER_KHRONOS_validation 1.4.357",
+    "synchronization_validation": true
+  },
+  "packages": {
+    "configuration": "Debug",
+    "client_tgz_generated": true,
+    "server_tgz_generated": true,
+    "extracted_client_smoke": "passed",
+    "extracted_server_smoke": "passed",
+    "extracted_package_gpu_test": "not run; source-built client covered by graphics CTest"
+  },
+  "additional_checks": {
+    "eight_player_network_soak": {
+      "exit_code": 0,
+      "seconds": 10,
+      "ticks": 584,
+      "commands": 4656,
+      "placements": 39,
+      "removals": 39,
+      "rejoins": 0,
+      "profiles_saved_reopened": 8
+    },
+    "meshing_reference_greedy_and_background_geometry_equivalence": {
+      "exit_code": 0,
+      "purpose": "correctness check only; Debug timing under concurrent workload is not performance evidence"
+    },
+    "compiler_project_inputs": 177,
+    "untracked_compiler_project_inputs": 0,
+    "recovered_original_files_verified_byte_for_byte": 54
+  },
+  "dependency_git_sources": {
+    "glm": {
+      "commit": "0af55ccecd98d4e5a8d1fad7de25ba429d60e863",
+      "status": ""
+    },
+    "entt": {
+      "commit": "4a2d1a8541228a90e02a873dba6a980506c42c03",
+      "status": ""
+    },
+    "nlohmann_json": {
+      "commit": "55f93686c01528224f448c19128836e7df245f72",
+      "status": ""
+    },
+    "sdl3": {
+      "commit": "877399b2b2cf21e67554ed9046410f268ce1d1b2",
+      "status": ""
+    },
+    "googletest": {
+      "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
+      "status": ""
+    }
+  },
+  "not_run": [
+    "Windows/MSVC",
+    "sustained human gameplay",
+    "long-duration soak",
+    "fuzz campaign",
+    "new native extensions"
+  ],
+  "nonblocking_warnings": [
+    "One pinned upstream SDL_string.c discarded-const compiler warning with GCC 16",
+    "Pinned GLM CMake minimum-policy deprecation notices",
+    "Original license-file whitespace preserved"
+  ],
+  "raw_evidence_directory": "/tmp/vc-baseline-recovery-9n1wafcl"
+}
