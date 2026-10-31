@@ -1,6 +1,8 @@
 # Milestone 2 handoff: ClientApplication and GameSession
 
-Status: proposed next work, **not implemented** in Milestone 1. Begin only after
+Status: historical Milestone 1 handoff. The follow-up is now implemented; see
+[ClientApplication/GameSession](client-sessions.md) and its verification/limitations.
+The original plan below is preserved for comparison. Begin only after
 the verification gate in [the progress record](modularization-progress.md) passes.
 Use the installed integration and architecture skills; preserve the legacy UI.
 

@@ -1,5 +1,8 @@
 # Modular core foundation (Milestone 1)
 
+This describes the Milestone 1 foundation. The implemented application/session
+follow-up and current ownership are documented in [client sessions](client-sessions.md).
+
 This is the implemented CMake/source architecture, built on the recovered baseline
 merged at `82d7f28`. It is ordinary C++23 libraries, not C++ language modules or a
 stable binary SDK. No source directories were relocated. The existing game,
@@ -103,7 +106,7 @@ the dependency guards enforce target links, not C++ visibility or arbitrary
 generator-expression/external dependency analysis. Gameplay still links generation
 and privately streaming through spawn validation. Protocol still shares command
 and simulation value APIs. These real dependencies are documented rather than
-hidden behind empty interfaces. Menus still start with a world, and local/remote
-loops still need extraction in Milestone 2.
+hidden behind empty interfaces. The subsequent application/session extraction is implemented in Milestone 2; see
+the client-session document for the current frame loop and owners.
 
 Verification and preservation evidence: [progress record](modularization-progress.md).

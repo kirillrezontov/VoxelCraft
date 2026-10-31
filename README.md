@@ -1,10 +1,16 @@
 # VoxelCraft — v0.8.2 release candidate
 
-The modular-core work preserves the playable v0.8.2 game and legacy UI. See the
+The modular-core and application/session work preserve the playable v0.8.2 game and legacy UI. See the
 [implemented architecture](docs/modular-architecture.md), [module graph](docs/module-dependency-graph.md),
 [compile-time generation example](docs/core-extension-points.md), and
-[Milestone 1 verification](docs/modularization-progress.md). ClientApplication/GameSession,
-the Native Mod SDK, VoxelUI Vulkan backend and UI redesign/migration are future work.
+[Milestone 1 verification](docs/modularization-progress.md). The [ClientApplication/GameSession](docs/client-sessions.md) is implemented.
+The Native Mod SDK, VoxelUI Vulkan backend and UI redesign/migration are future work.
+
+Start without options for the application menu. Play sandbox loads/creates the
+local world; Connect uses the entered server address and player name. The legacy
+pause menu's **Return to main menu** saves local play or disconnects remote play
+without restarting. Explicit `--world-dir`, `--connect` and bounded test options
+retain direct startup. See [session ownership and verification](docs/client-sessions.md).
 
 A C++23, SDL3 and Vulkan 1.3 voxel sandbox foundation. Windows is the primary release
 target; development and hardware rendering verification currently run on Linux.

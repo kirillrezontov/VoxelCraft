@@ -7,7 +7,7 @@
 - [x] Concrete shared content ownership/rebuild contract and protocol/modding separation
 - [x] Tested compile-time terrain worker policy and executable alternate-terrain example
 - [x] Document current ownership, dependencies and the ClientApplication/GameSession handoff
-- [ ] Milestone 2: application/session split and return to main menu in one process
+- [x] Milestone 2: application/session split and return to main menu in one process
 - [ ] Milestone 3: versioned Native Mod SDK and extension foundation
 - [ ] Milestone 4: independent VoxelUI Vulkan backend
 - [ ] Milestone 5: original SVG design system
@@ -15,6 +15,7 @@
 - [ ] Milestone 7: verified legacy UI removal
 - [ ] Milestone 8: cross-platform hardening and release preparation
 
+Milestone 2 contracts and verification are in [client sessions](docs/client-sessions.md).
 Milestone 1's executed verification and limitations are recorded in
 [modularization progress](docs/modularization-progress.md). Later milestones have
 not been implemented by this refactor. Windows/MSVC and sustained human gameplay

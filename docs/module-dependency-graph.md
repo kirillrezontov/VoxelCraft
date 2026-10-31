@@ -1,5 +1,10 @@
 # Module dependency graph
 
+Milestone 2 keeps these engine boundaries. `vc_client_runtime` now implements
+ClientApplication, both coroutine sessions and the transitional menu. The executable
+links only that composition library and its SDL platform entry support; see
+[client sessions](client-sessions.md).
+
 Arrows mean “depends on”. The build creates these targets; the diagram groups
 small platform utilities, rather than creating a universal platform library.
 

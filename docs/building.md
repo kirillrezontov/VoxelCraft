@@ -1,5 +1,10 @@
 # Building
 
+The client starts at a world-free application menu. Explicit `--world-dir`,
+`--connect`, `--frames` and `--smoke` retain direct startup for developers/tests.
+Local and remote sessions can return to the menu from the legacy pause screen.
+See [application/session contracts and verification](client-sessions.md).
+
 The [module graph](module-dependency-graph.md) documents the CPU-only engine and
 headless boundaries. To run the real compile-time generator alternative without
 desktop dependencies:

@@ -1,0 +1,76 @@
+{
+  "date": "2026-11-01",
+  "branch": "feature/client-sessions",
+  "base_commit": "9c9a1d7",
+  "code_commit": "34b2d0f2d837ceccc433a971c50491477ea29488",
+  "environment": {
+    "gcc": "16.2.1",
+    "clang": "22.1.8",
+    "cmake": "4.4.3",
+    "gpu": "AMD Radeon Graphics (RADV RENOIR)",
+    "graphics_session": "isolated KWin virtual Wayland with Khronos synchronization validation"
+  },
+  "results": {
+    "gcc_full_build": "passed",
+    "cpu_cli": {
+      "passed": 219,
+      "failed": 0
+    },
+    "graphics": {
+      "passed": 13,
+      "failed": 0
+    },
+    "extended_lifecycle": "passed: mod atlas, settings, save failure/retry, cancel, repeated local and remote",
+    "asan_ubsan_cpu_leaks_enabled": {
+      "passed": 219,
+      "failed": 0
+    },
+    "tsan": {
+      "passed": 17,
+      "failed": 0
+    },
+    "asan_ubsan_gpu_leaks_disabled": {
+      "passed": 1,
+      "failed": 0,
+      "test_commit": "e6397fb"
+    },
+    "gpu_lsan": {
+      "status": "failed",
+      "bytes": 128,
+      "allocations": 1,
+      "control": "Same report in existing Client.Environment without ClientApplication/GameSession; unknown unloaded-module allocation; exact origin unresolved",
+      "suppression_added": false
+    },
+    "clean_committed_build": {
+      "commit": "34b2d0f2d837ceccc433a971c50491477ea29488",
+      "build": "passed",
+      "cpu_cli": {
+        "passed": 219,
+        "failed": 0
+      },
+      "dependency_audit": {
+        "tracked_project_inputs": 192,
+        "missing": 0,
+        "original_feature_worktree_references": 0,
+        "server_has_no_application_renderer_ui_meshing": true
+      },
+      "graphics": {
+        "passed": 13,
+        "failed": 0
+      },
+      "extended_lifecycle_rerun": "passed at e6397fb, including rejected-handshake error/back navigation"
+    },
+    "server_only": "passed: clean GCC client OFF/testing OFF target build, no application/renderer/UI/meshing, 30-tick run",
+    "packages": "Client/server TGZ CPU extraction/runtime checks and --gpu extracted-client rendering passed",
+    "windows_msvc": "not executed",
+    "sustained_human_gameplay": "not executed",
+    "performance_benchmark": "not executed; voxel algorithms unchanged"
+  },
+  "evidence_directory": "/tmp/vc-client-sessions-e4lz4w4_ (symlink to disk-backed cache)",
+  "tracking_audit": "zero findings at code commit in both independent repositories",
+  "verification_test_commit": "e6397fb",
+  "commits": [
+    "34b2d0f: application/session implementation",
+    "e6397fb: rejected-remote-session coverage"
+  ]
+}
