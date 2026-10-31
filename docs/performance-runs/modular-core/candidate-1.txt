@@ -1,0 +1,6 @@
+Unit faces (reference): 150 chunks, 639600 vertices, 319800 triangles; main-thread calls median 0.021 ms, p95 2.363 ms, max 3.687 ms; main CPU 80.327 ms; wall 82.036 ms
+Greedy opaque faces: 150 chunks, 185836 vertices, 92918 triangles; main-thread calls median 0.021 ms, p95 1.591 ms, max 2.174 ms; main CPU 61.569 ms; wall 61.592 ms
+Chunk cell payload 65536 bytes; Vertex 84 bytes.
+Synchronous (budget 2): 150 chunks, 185836 vertices, 92918 triangles; main-thread calls median 0.513 ms, p95 2.668 ms, max 3.173 ms; main CPU 60.505 ms; wall 60.515 ms
+Background (snapshot budget 2): 150 chunks, 185836 vertices, 92918 triangles; main-thread calls median 0.105 ms, p95 0.151 ms, max 0.169 ms; main CPU 8.533 ms; wall 92.311 ms
+CPU-only fixed-seed Debug/Release comparison; excludes rendering and GPU upload. Background wall time includes 1 ms polling sleeps.

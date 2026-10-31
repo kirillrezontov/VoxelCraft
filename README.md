@@ -15,6 +15,11 @@ release. See the [implementation/test record](docs/v0.8.2-implementation.md),
 [command reference](docs/v0.8.2-commands.md), [UI guide](docs/v0.8.2-ui-design.md)
 and [release notes](docs/v0.8.2-release-notes.md).
 
+The [modular core foundation](docs/modular-architecture.md) documents the CPU
+module split, persistence service and compile-time mesher selection. See its
+[verification gate](docs/modularization-progress.md) and
+[ClientApplication/GameSession handoff](docs/next-milestone-client-sessions.md).
+
 The [baseline recovery record](docs/baseline-recovery.md) documents the original
 files omitted from earlier commits, their provenance and clean-checkout checks.
 

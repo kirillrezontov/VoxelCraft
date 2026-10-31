@@ -1,5 +1,14 @@
 # Building
 
+Milestone 1 splits CPU generation, lighting and meshing from voxel storage and
+checks project module links at configure time. See the
+[dependency graph](module-dependency-graph.md) and
+[executed verification](modularization-progress.md). `VC_CORE_MESHER=greedy`
+(default) or `culled` selects the actual client meshing policy at compile time;
+see [extension points](core-extension-points.md). The dedicated server has no
+meshing/lighting/UI link dependency. With `VC_BUILD_CLIENT=OFF` and
+`BUILD_TESTING=OFF`, unused client CPU targets are excluded from the default build.
+
 ## Dependency policy
 
 CMake FetchContent pins SDL to `release-3.2.10`, GLM to `1.0.1`, and GoogleTest to

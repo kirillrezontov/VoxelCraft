@@ -1,5 +1,12 @@
 # Architecture: viewer, interaction and persistent sandbox
 
+The implemented Milestone 1 target split, persistence owner and static mesher
+contract are described in [modular architecture](modular-architecture.md), with
+the [dependency graph](module-dependency-graph.md) and
+[verification gate](modularization-progress.md). The paths below remain valid;
+`engine/voxel` now spans independent voxel/generation/lighting/meshing/storage
+targets. ClientApplication/GameSession remain the next extraction.
+
 `client/main.cpp` composes local play; shared CLI/preferences and the connected
 loop live in `client/options.*`, `preferences.*`, and `network_client.*`.
 `server/main.cpp` composes the headless host and console lifecycle.

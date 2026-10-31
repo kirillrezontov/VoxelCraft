@@ -1,0 +1,426 @@
+{
+  "date": "2026-11-01",
+  "starting_branch": "main",
+  "starting_commit": "82d7f28570d3340b0633786b7725bd175cbd768d",
+  "implementation_commit": "4f9c1b37a12dc808a037d63da3e42a3cdb3c93d9",
+  "branch": "feature/modular-core-m1",
+  "voxelui_unchanged": "2e1cb61121d907e215facd89fc84b8a7b2e44798",
+  "recovered_files_tracked_and_hash_matched": 54,
+  "raw_evidence_directory": "/tmp/vc-m1-44pkvig5",
+  "clean_checkout": "/tmp/voxel-clean-checkout-x8fd6ecj",
+  "environment": {
+    "cpu": "AMD Ryzen 7 5800H, 16 logical CPUs",
+    "gcc": "16.2.1",
+    "clang": "22.1.8",
+    "cmake": "4.4.3",
+    "gpu_execution": "blocked: no SDL video device; private D-Bus socket binding denied"
+  },
+  "dependencies": {
+    "glm": "0af55ccecd98d4e5a8d1fad7de25ba429d60e863",
+    "entt": "4a2d1a8541228a90e02a873dba6a980506c42c03",
+    "json": "55f93686c01528224f448c19128836e7df245f72",
+    "googletest": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
+    "sdl3": "877399b2b2cf21e67554ed9046410f268ce1d1b2",
+    "lua": "5.4.9; upstream archive SHA256 verified",
+    "stb_image": "013ac3beddff3dbffafd5177e7972067cd2b5083; header SHA256 verified",
+    "strategy": "Explicit cached pinned sources, fresh build outputs; no dependency download or system package substitution"
+  },
+  "baseline_cpu_cli": {
+    "total": 211,
+    "passed": 190,
+    "failed": [
+      "Tcp.LoopbackTransfersPartialBuffersAndReportsWouldBlock",
+      "Tcp.CloseMoveAndPortOwnershipReleaseResources",
+      "Tcp.InvalidArgumentsAndRefusedConnectionsFailExplicitly",
+      "NetworkFrames.LoopbackBackpressureAndBidirectionalMessagesDrainWithSmallBudgets",
+      "NetworkFrames.DisconnectRejectsTruncatedFrameAndKeepsCompleteMessages",
+      "ServerHost.RealClientsShareEditsMotionAndPersistentIndependentProfiles",
+      "ServerHost.ContentMismatchAndDuplicateNamesAreRejectedWithoutExtraProfiles",
+      "ServerHost.InitialCommandTimeoutStopsMotionAndUnknownPacketsDoNotKillHost",
+      "ServerHost.AsynchronousSaveFailureKeepsPeersAndEditsAvailableForRetry",
+      "ServerHost.IdleSessionExpiresAndShutdownExplainsDisconnect",
+      "ServerHost.ProtocolMismatchAndCommandFloodDoNotInterruptAnotherPlayer",
+      "ServerSurvival.ServerTimesMiningCraftsTransfersConsumesAndPersistsPrivateInventories",
+      "ServerSurvival.FallDeathFreezesMovementAndRespawnRetainsInventory",
+      "ServerSurvival.CreativeInventoryFabricationDisconnectsOnlyTheOffendingPeer",
+      "ServerIdentity.CredentialsBindSavedProfilesAcrossRestartAndDoNotEnterWorldData",
+      "ServerIdentity.PublicBindRequiresCredentialsOrExplicitTrustedNetwork",
+      "ServerCommands.AuthenticatedRolesRealEffectsPrivateStateAndRestart",
+      "ServerCommands.AnonymousNamesCannotInheritRolesAndFloodIsBounded",
+      "ServerCommands.DuplicateIdsAndOversizeWireTextDisconnectOnlyTheSender",
+      "Server.Process",
+      "Server.MalformedStress"
+    ]
+  },
+  "clean_cpu_cli": {
+    "total": 222,
+    "passed": 201,
+    "failed": [
+      "Tcp.LoopbackTransfersPartialBuffersAndReportsWouldBlock",
+      "Tcp.CloseMoveAndPortOwnershipReleaseResources",
+      "Tcp.InvalidArgumentsAndRefusedConnectionsFailExplicitly",
+      "NetworkFrames.LoopbackBackpressureAndBidirectionalMessagesDrainWithSmallBudgets",
+      "NetworkFrames.DisconnectRejectsTruncatedFrameAndKeepsCompleteMessages",
+      "ServerHost.RealClientsShareEditsMotionAndPersistentIndependentProfiles",
+      "ServerHost.ContentMismatchAndDuplicateNamesAreRejectedWithoutExtraProfiles",
+      "ServerHost.InitialCommandTimeoutStopsMotionAndUnknownPacketsDoNotKillHost",
+      "ServerHost.AsynchronousSaveFailureKeepsPeersAndEditsAvailableForRetry",
+      "ServerHost.IdleSessionExpiresAndShutdownExplainsDisconnect",
+      "ServerHost.ProtocolMismatchAndCommandFloodDoNotInterruptAnotherPlayer",
+      "ServerSurvival.ServerTimesMiningCraftsTransfersConsumesAndPersistsPrivateInventories",
+      "ServerSurvival.FallDeathFreezesMovementAndRespawnRetainsInventory",
+      "ServerSurvival.CreativeInventoryFabricationDisconnectsOnlyTheOffendingPeer",
+      "ServerIdentity.CredentialsBindSavedProfilesAcrossRestartAndDoNotEnterWorldData",
+      "ServerIdentity.PublicBindRequiresCredentialsOrExplicitTrustedNetwork",
+      "ServerCommands.AuthenticatedRolesRealEffectsPrivateStateAndRestart",
+      "ServerCommands.AnonymousNamesCannotInheritRolesAndFloodIsBounded",
+      "ServerCommands.DuplicateIdsAndOversizeWireTextDisconnectOnlyTheSender",
+      "Server.Process",
+      "Server.MalformedStress"
+    ]
+  },
+  "new_tests_passed": 11,
+  "asan_ubsan_full_leaks_disabled": {
+    "total": 203,
+    "passed": 182,
+    "failed": [
+      "Tcp.LoopbackTransfersPartialBuffersAndReportsWouldBlock",
+      "Tcp.CloseMoveAndPortOwnershipReleaseResources",
+      "Tcp.InvalidArgumentsAndRefusedConnectionsFailExplicitly",
+      "NetworkFrames.LoopbackBackpressureAndBidirectionalMessagesDrainWithSmallBudgets",
+      "NetworkFrames.DisconnectRejectsTruncatedFrameAndKeepsCompleteMessages",
+      "ServerHost.RealClientsShareEditsMotionAndPersistentIndependentProfiles",
+      "ServerHost.ContentMismatchAndDuplicateNamesAreRejectedWithoutExtraProfiles",
+      "ServerHost.InitialCommandTimeoutStopsMotionAndUnknownPacketsDoNotKillHost",
+      "ServerHost.AsynchronousSaveFailureKeepsPeersAndEditsAvailableForRetry",
+      "ServerHost.IdleSessionExpiresAndShutdownExplainsDisconnect",
+      "ServerHost.ProtocolMismatchAndCommandFloodDoNotInterruptAnotherPlayer",
+      "ServerSurvival.ServerTimesMiningCraftsTransfersConsumesAndPersistsPrivateInventories",
+      "ServerSurvival.FallDeathFreezesMovementAndRespawnRetainsInventory",
+      "ServerSurvival.CreativeInventoryFabricationDisconnectsOnlyTheOffendingPeer",
+      "ServerIdentity.CredentialsBindSavedProfilesAcrossRestartAndDoNotEnterWorldData",
+      "ServerIdentity.PublicBindRequiresCredentialsOrExplicitTrustedNetwork",
+      "ServerCommands.AuthenticatedRolesRealEffectsPrivateStateAndRestart",
+      "ServerCommands.AnonymousNamesCannotInheritRolesAndFloodIsBounded",
+      "ServerCommands.DuplicateIdsAndOversizeWireTextDisconnectOnlyTheSender",
+      "Server.Process",
+      "Server.MalformedStress"
+    ]
+  },
+  "asan_ubsan_available_subset": {
+    "total": 182,
+    "passed": 182,
+    "failed": []
+  },
+  "leak_sanitizer": "blocked: fatal process-inspection error after five new tests passed their assertions; not a leak-check pass",
+  "tsan": {
+    "selected": 16,
+    "passed": 16,
+    "selection": "^(TerrainWorker|MeshWorker|BackgroundMeshing|SnapshotWriter|WorldPersistence|CoreModules)\\."
+  },
+  "graphics": {
+    "total": 12,
+    "passed": 0,
+    "failed": [
+      "Client.Console",
+      "Client.NetworkExecutables",
+      "Client.NetworkSurvival",
+      "Client.Network",
+      "Client.Creatures",
+      "Client.Environment",
+      "Client.Survival",
+      "Client.Streaming",
+      "Client.Inventory",
+      "Client.Persistence",
+      "Client.SdlPlaytest",
+      "Client.GpuSmoke"
+    ]
+  },
+  "culled_client": {
+    "build": "passed",
+    "cli_passed": 6,
+    "gpu_runtime": "blocked"
+  },
+  "builds": {
+    "baseline_full_gcc": "passed",
+    "candidate_full_gcc": "passed",
+    "clean_full_gcc": "passed",
+    "clean_server_only_gcc": "passed",
+    "clean_clang_asan_ubsan": "passed",
+    "clean_clang_tsan": "passed"
+  },
+  "persistence_compatibility": "Baseline WorldStore wrote format 1/player 10; new WorldPersistence loaded, edited and saved; baseline reader reopened revision 2 successfully",
+  "packages": {
+    "generation": "client and server TGZ passed",
+    "client_extracted_smoke": "passed, CPU/assets/runtime checks only",
+    "server_extracted_smoke": "failed at TCP listen: sandbox socket error 1"
+  },
+  "compiler_dependency_audit": {
+    "tracked_project_inputs": 185,
+    "untracked_or_original_workspace_project_inputs": 0,
+    "explicit_dependency_cache_excluded": true
+  },
+  "performance": {
+    "configuration": "GCC RelWithDebInfo, no sanitizers, seed 42, 150 chunks, generator 3, radius 2; one warmup and three alternating independent runs per revision; existing benchmark counters only",
+    "measurements": {
+      "Unit faces (reference)": {
+        "baseline": {
+          "geometry": [
+            [
+              150,
+              639600,
+              319800
+            ],
+            [
+              150,
+              639600,
+              319800
+            ],
+            [
+              150,
+              639600,
+              319800
+            ]
+          ],
+          "cpu_ms": [
+            85.138,
+            86.082,
+            85.86
+          ],
+          "wall_ms": [
+            87.256,
+            88.318,
+            88.218
+          ],
+          "cpu_median_ms": 85.86,
+          "wall_median_ms": 88.218
+        },
+        "candidate": {
+          "geometry": [
+            [
+              150,
+              639600,
+              319800
+            ],
+            [
+              150,
+              639600,
+              319800
+            ],
+            [
+              150,
+              639600,
+              319800
+            ]
+          ],
+          "cpu_ms": [
+            80.327,
+            85.646,
+            77.886
+          ],
+          "wall_ms": [
+            82.036,
+            87.973,
+            79.816
+          ],
+          "cpu_median_ms": 80.327,
+          "wall_median_ms": 82.036
+        }
+      },
+      "Greedy opaque faces": {
+        "baseline": {
+          "geometry": [
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ]
+          ],
+          "cpu_ms": [
+            62.616,
+            61.431,
+            61.395
+          ],
+          "wall_ms": [
+            62.636,
+            61.454,
+            61.415
+          ],
+          "cpu_median_ms": 61.431,
+          "wall_median_ms": 61.454
+        },
+        "candidate": {
+          "geometry": [
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ]
+          ],
+          "cpu_ms": [
+            61.569,
+            57.763,
+            58.105
+          ],
+          "wall_ms": [
+            61.592,
+            57.784,
+            58.128
+          ],
+          "cpu_median_ms": 58.105,
+          "wall_median_ms": 58.128
+        }
+      },
+      "Synchronous (budget 2)": {
+        "baseline": {
+          "geometry": [
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ]
+          ],
+          "cpu_ms": [
+            61.686,
+            60.75,
+            60.692
+          ],
+          "wall_ms": [
+            61.694,
+            60.759,
+            60.7
+          ],
+          "cpu_median_ms": 60.75,
+          "wall_median_ms": 60.759
+        },
+        "candidate": {
+          "geometry": [
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ]
+          ],
+          "cpu_ms": [
+            60.505,
+            57.086,
+            57.043
+          ],
+          "wall_ms": [
+            60.515,
+            57.095,
+            57.054
+          ],
+          "cpu_median_ms": 57.086,
+          "wall_median_ms": 57.095
+        }
+      },
+      "Background (snapshot budget 2)": {
+        "baseline": {
+          "geometry": [
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ]
+          ],
+          "cpu_ms": [
+            8.662,
+            8.807,
+            8.545
+          ],
+          "wall_ms": [
+            96.342,
+            94.651,
+            94.25
+          ],
+          "cpu_median_ms": 8.662,
+          "wall_median_ms": 94.651
+        },
+        "candidate": {
+          "geometry": [
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ],
+            [
+              150,
+              185836,
+              92918
+            ]
+          ],
+          "cpu_ms": [
+            8.533,
+            9.001,
+            8.544
+          ],
+          "wall_ms": [
+            92.311,
+            94.783,
+            95.201
+          ],
+          "cpu_median_ms": 8.544,
+          "wall_median_ms": 94.783
+        }
+      }
+    },
+    "limits": "CPU only; background wall includes 1 ms polling sleeps; no GPU/allocation measurement; short-run timing variation is not a performance guarantee"
+  },
+  "milestone_gate": "open: networking, SDL/Vulkan playtests and leak checking need an unrestricted capable runner; later milestones not started"
+}

@@ -1,5 +1,13 @@
 # VoxelCraft Development Roadmap
 
+Milestone 1 implementation: separate voxel/generation/lighting/meshing libraries,
+owned persistence, checked module links and static mesher composition. Current
+verification and outstanding environment gates are recorded in
+[modularization progress](docs/modularization-progress.md); do not advance to
+[client sessions](docs/next-milestone-client-sessions.md) until that gate closes.
+Native SDK, VoxelUI Vulkan rendering, SVG redesign and legacy UI removal remain
+later milestones.
+
 ## Current Milestone: v0.8.2 — UI/UX and Developer Console (release candidate)
 
 - [x] Baseline audit/build and 185-test regression baseline
