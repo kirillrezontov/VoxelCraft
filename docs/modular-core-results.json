@@ -48,10 +48,29 @@
     "server_only_build_and_runtime": "passed; client OFF, testing OFF; executable target only; no SDL/Vulkan discovery, no UI/meshing compile",
     "baseline_save_compatibility": "passed; copied baseline survival world with example mods loaded revision 1 and saved revision 2; original retained",
     "dependency_guard_fixtures": "acyclic accepted, cycle and forbidden transitive edge rejected",
-    "clean_committed_build": "pending",
-    "packages": "not executed yet",
+    "clean_committed_build": {
+      "commit": "1ef0722ff0893d5591912171607a537bf79138b2",
+      "fresh_dependency_downloads": true,
+      "full_client_server_build": "passed",
+      "cpu_cli": {
+        "passed": 216,
+        "failed": 0
+      },
+      "compiler_input_audit": {
+        "project_inputs": 187,
+        "missing": [],
+        "project_translation_units": 110,
+        "original_worktree_references": 0
+      },
+      "graphics": {
+        "passed": 12,
+        "failed": 0
+      }
+    },
+    "packages": "Client/server TGZ archives generated; both extracted CPU smoke tests and --gpu extracted-client rendering/persistence checks passed",
     "windows_msvc": "not executed",
-    "sustained_human_gameplay": "not executed"
+    "sustained_human_gameplay": "not executed",
+    "tracking_audit": "zero findings in both repositories, 16 explicit inputs tracked in clean source"
   },
   "recovery_audit": {
     "tracked_and_original_hash_matched": 54,
@@ -1025,5 +1044,53 @@
         }
       }
     }
-  }
+  },
+  "changed_files": [
+    "CMakeLists.txt",
+    "CMakePresets.json",
+    "README.md",
+    "ROADMAP.md",
+    "client/main.cpp",
+    "client/network_client.cpp",
+    "cmake/EngineModules.cmake",
+    "cmake/ModuleBoundaries.cmake",
+    "docs/architecture.md",
+    "docs/building.md",
+    "docs/core-extension-points.md",
+    "docs/modular-architecture.md",
+    "docs/modular-core-results.json",
+    "docs/modularization-progress.md",
+    "docs/module-dependency-graph.md",
+    "docs/next-milestone-client-sessions.md",
+    "engine/core/content_presentation.hpp",
+    "engine/core/resource_types.hpp",
+    "engine/renderer/texture.hpp",
+    "engine/voxel/mesher.hpp",
+    "engine/voxel/registry.hpp",
+    "engine/voxel/terrain_worker.cpp",
+    "engine/voxel/terrain_worker.hpp",
+    "engine/voxel/terrain_worker.inl",
+    "examples/core_modules/layered_generator.hpp",
+    "examples/core_modules/main.cpp",
+    "game/content/services.cpp",
+    "game/content/services.hpp",
+    "game/network/content_fingerprint.cpp",
+    "game/network/content_fingerprint.hpp",
+    "game/network/protocol.cpp",
+    "game/network/protocol.hpp",
+    "server/host.cpp",
+    "tests/content_services_tests.cpp",
+    "tests/core_module_tests.cpp",
+    "tests/network_playtest.cpp",
+    "tests/network_survival_playtest.cpp",
+    "tests/protocol_tests.cpp"
+  ],
+  "fresh_dependency_revisions": {
+    "glm": "0af55ccecd98d4e5a8d1fad7de25ba429d60e863",
+    "entt": "4a2d1a8541228a90e02a873dba6a980506c42c03",
+    "nlohmann_json": "55f93686c01528224f448c19128836e7df245f72",
+    "googletest": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
+    "sdl3": "877399b2b2cf21e67554ed9046410f268ce1d1b2"
+  },
+  "compatibility_content_fingerprint": "390040753740130847 (identical baseline and candidate with example mods)"
 }

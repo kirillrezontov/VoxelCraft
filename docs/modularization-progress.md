@@ -40,8 +40,10 @@ Implementation commits:
    actual example and regressions.
 2. `3e12bcc` — project-root-relative CMake source expressions (same resolved sources;
    avoids the tracking helper interpreting included-file inputs relative to `cmake/`).
-3. Subsequent documentation/evidence commits contain this report, architecture,
-   handoff, README/ROADMAP/build updates and machine-readable results.
+3. `1ef0722` — architecture, ownership, handoff, README/ROADMAP/build documentation
+   and the initial verification record.
+4. The final evidence commit records the completed clean-checkout, tracking and
+   extracted-package checks; it changes documentation only.
 
 ## Executed checks
 
@@ -68,8 +70,8 @@ FetchContent path and downloads dependencies afresh, with no overrides.
 | Client OFF/testing OFF, build only `voxelcraft_server`, execute 30 ticks | Passed; no SDL/Vulkan discovery or UI/mesher compilation |
 | Existing baseline survival world with example Lua/data mods, copied and reopened by candidate | Passed; revision 1 loaded, revision 2 saved; original preserved |
 | Dependency-check fixtures | Acyclic accepted; cycle and forbidden transitive dependency rejected |
-| Committed-source clean full build / CPU tests / input audit | In progress; final result recorded before milestone completion |
-| Extracted client/server packages | Not executed yet |
+| Committed-source clean full build / CPU + graphics tests / input audit | Passed; **216/216** CPU/CLI + **12/12** SDL/Vulkan; **187/187** compiler-resolved project inputs tracked, zero original-worktree references |
+| Extracted client/server TGZ packages | Both generated; extracted CPU checks and `--gpu` client rendering/persistence checks passed |
 | Windows/MSVC, sustained human gameplay, long soak/fuzz campaign | Not executed |
 
 Environment: Linux x86_64, AMD Ryzen 7 5800H, GCC 16.2.1, Clang 22.1.8,
@@ -78,7 +80,8 @@ with the installed Khronos layer, strict synchronization validation, and a priva
 KWin virtual Wayland display. Tests cover console/Unicode/resize, local and real
 remote executables, survival/death/crafting, creatures/environment, streaming,
 inventory, persistence, SDL edits and renderer lifecycle. Successful explicit
-renderer reports show zero validation errors/warnings through shutdown. These
+renderer reports show zero validation errors/warnings through shutdown. The actual
+legacy inventory capture was visually inspected (catalog/icons, tooltip and hotbar). These
 are scripted interactions, not claims of sustained manual play or Windows success.
 
 ## Exact reproduction commands
@@ -112,6 +115,31 @@ cmake -S . -B build/m1-perf -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo \
 cmake --build build/m1-perf --target vc_mesh_benchmark --parallel 2
 build/m1-perf/bin/vc_mesh_benchmark
 ```
+
+The clean build initially configured committed code `5ec7396` with freshly downloaded
+default dependencies, then advanced to `1ef0722` and reconfigured/rebuilt/tested. The
+only intervening code change anchors CMake source expressions to the project root;
+resolved compiler commands are identical. Final evidence commits update documentation
+only. Both clean passes ran all 216 CPU/CLI tests. Compiler dependency inspection
+found 187 project inputs, all tracked, and no references to the original worktree.
+Explicit new source/font/shader requirements passed separately. Tracking audits
+report zero findings in both the isolated VoxelCraft worktree and unchanged VoxelUI.
+The isolated feature worktree is clean after commits; no required untracked files
+or ignored local originals supply the build. No system packages were installed.
+
+Packaging reproduction:
+
+```sh
+cpack --config build/m1/CPackConfig.cmake -C Debug
+python3 tests/package_smoke.py build/m1/packages/*.tar.gz
+# With a usable display/device/layer, include extracted-client rendering:
+python3 tests/package_smoke.py --gpu build/m1/packages/*.tar.gz
+```
+
+Nonblocking build diagnostics are the pinned SDL `SDL_string.c` const warning with
+GCC 16 and upstream GLM CMake deprecation notices. The initial extraction exposed
+an implicit texture include and a benchmark streaming link, both corrected before
+the final clean build. No project compiler or sanitizer failures remain.
 
 Current-run sanitizer trees use the same preset variables in out-of-tree `asan`
 and `tsan` directories. The TSan selection is

@@ -20,7 +20,7 @@ Milestone 1's executed verification and limitations are recorded in
 not been implemented by this refactor. Windows/MSVC and sustained human gameplay
 acceptance remain separate gates.
 
-## Current Milestone: v0.8.2 — UI/UX and Developer Console (release candidate)
+## Inherited v0.8.2 — UI/UX and Developer Console (release candidate)
 
 - [x] Baseline audit/build and 185-test regression baseline
 - [x] Licensed embedded sans/mono TrueType fonts, UTF-8/Cyrillic, bounded glyph cache
