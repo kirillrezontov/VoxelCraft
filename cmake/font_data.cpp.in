@@ -1,0 +1,10 @@
+#include "engine/ui/font.hpp"
+namespace vc::ui {
+namespace {
+const unsigned char regular[]{@VC_FONT_REGULAR@};
+const unsigned char mono[]{@VC_FONT_MONO@};
+}
+std::span<const unsigned char> bundledFont(bool monospace) {
+    return monospace?std::span<const unsigned char>(mono):std::span<const unsigned char>(regular);
+}
+}
