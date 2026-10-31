@@ -6,7 +6,8 @@
 namespace vc::voxel {
 // Main-thread mesh work is bounded per frame, with camera-near chunks first.
 // Removal messages do not consume the CPU meshing budget.
-class ChunkMeshQueue {
+template<ChunkMesher Mesher>
+class BasicChunkMeshQueue {
 public:
     void collect(World& world);
     void invalidate(std::span<const Position> chunks);
@@ -16,4 +17,8 @@ public:
 private:
     std::set<Position> pending_;
 };
+using ChunkMeshQueue = BasicChunkMeshQueue<GreedyChunkMesher>;
+extern template class BasicChunkMeshQueue<GreedyChunkMesher>;
+extern template class BasicChunkMeshQueue<CulledChunkMesher>;
 }
+#include "engine/voxel/mesh_queue_impl.hpp"

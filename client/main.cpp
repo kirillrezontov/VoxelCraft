@@ -1,4 +1,5 @@
 #include "client/options.hpp"
+#include "client/core_modules.hpp"
 #include "client/preferences.hpp"
 #include "client/network_client.hpp"
 #include "engine/core/log.hpp"
@@ -8,7 +9,7 @@
 #include "engine/voxel/generation.hpp"
 #include "engine/voxel/terrain_worker.hpp"
 #include "engine/voxel/storage.hpp"
-#include "engine/voxel/snapshot_writer.hpp"
+#include "engine/voxel/persistence.hpp"
 #include "engine/voxel/streaming.hpp"
 #include "engine/voxel/mesh_queue.hpp"
 #include "engine/voxel/mesh_worker.hpp"
@@ -60,13 +61,13 @@ int run(const vc::client::Options& options) {
     for(const auto& id:mods.order()) vc::log("Mod: "+id);
     vc::voxel::WorldMetadata metadata{options.seed,options.bounds,options.generatorVersion.value_or(vc::voxel::terrainGenerationVersion)};
     vc::voxel::World world;
-    std::unique_ptr<vc::voxel::WorldStore> store;
+    std::unique_ptr<vc::voxel::WorldPersistence> store;
     std::vector<vc::voxel::Position> savedChunks;
     std::optional<vc::PlayerSaveState> savedPlayer;
     // Bounded test/screenshot runs stay temporary unless given an explicit world.
     if(!options.noSave && !options.smoke && (!options.frameLimit || !options.worldDirectory.empty())) {
         const auto directory=options.worldDirectory.empty()?vc::Window::userDataPath()/"worlds"/"sandbox":options.worldDirectory;
-        store=std::make_unique<vc::voxel::WorldStore>(directory);
+        store=std::make_unique<vc::voxel::WorldPersistence>(directory);
         if(auto archive=store->load(registry)) {
             if(options.seedSpecified&&options.seed!=archive->metadata.seed)
                 throw std::invalid_argument("--seed differs from the saved world; use a new --world-dir");
@@ -128,8 +129,8 @@ int run(const vc::client::Options& options) {
     const double meshingStart = vc::Window::seconds();
     vc::voxel::Lighting lighting;const auto initialDirty=world.takeDirtyChunks();
     (void)lighting.refresh(world,registry,initialDirty);
-    std::unique_ptr<vc::voxel::BackgroundMeshQueue> backgroundMeshes;
-    if(!options.smoke) backgroundMeshes=std::make_unique<vc::voxel::BackgroundMeshQueue>(registry,atlas);
+    std::unique_ptr<vc::client::CoreBackgroundMeshQueue> backgroundMeshes;
+    if(!options.smoke) backgroundMeshes=std::make_unique<vc::client::CoreBackgroundMeshQueue>(registry,atlas);
     std::vector<vc::Mesh> meshes;
     std::optional<vc::voxel::Position> emptyCell;
     if(backgroundMeshes) {
@@ -143,7 +144,7 @@ int run(const vc::client::Options& options) {
         }
     } else for (const auto& [position, chunk] : world.chunks()) {
         (void)position;
-        auto mesh = vc::voxel::meshChunk(chunk,world,registry,atlas,&lighting);
+        auto mesh = vc::client::CoreMesher::build(chunk,world,registry,atlas,&lighting);
         if (!mesh.indices.empty()||!mesh.translucentIndices.empty()) meshes.push_back(std::move(mesh));
         else if (!emptyCell) {
             const auto origin = vc::voxel::chunkOrigin(position);
@@ -155,7 +156,7 @@ int run(const vc::client::Options& options) {
     if(!backgroundMeshes) renderer.upload(meshes);
     meshes.clear(); meshes.shrink_to_fit();
     (void)world.takeDirtyChunks();
-    vc::voxel::ChunkMeshQueue meshQueue;
+    vc::client::CoreMeshQueue meshQueue;
     vc::log("Seed " + std::to_string(metadata.seed) + "; loaded " + std::to_string(world.chunks().size()) +
         " chunks; drawable " + std::to_string(renderer.meshCount()) + "; triangles " + std::to_string(renderer.triangleCount()));
     vc::log("Generation " + std::to_string((meshingStart - generationStart) * 1000) + " ms; mesh preparation " +
@@ -197,23 +198,21 @@ int run(const vc::client::Options& options) {
         for(const auto& diagnostic:mods.takeDiagnostics()) { vc::log(diagnostic);notify(diagnostic,vc::NotificationSeverity::Error); }
     };
     dispatchMod({vc::ModEventKind::Load});
-    std::unique_ptr<vc::voxel::SnapshotWriter> snapshotWriter;
-    if(store) snapshotWriter=std::make_unique<vc::voxel::SnapshotWriter>(*store);
     const auto finishSnapshot=[&](const vc::voxel::SnapshotResult& result) {
         result.rethrowIfFailed();
         vc::log("Saved world revision "+std::to_string(result.revision)+" in "+std::to_string(result.milliseconds)+" ms to "+vc::pathText(store->directory()));
         notify("SAVED WORLD "+std::to_string(result.revision),vc::NotificationSeverity::Success);
     };
     const auto awaitSnapshot=[&] {
-        while(snapshotWriter->busy()) {
-            if(const auto result=snapshotWriter->takeReady()) { finishSnapshot(*result);break; }
+        while(store->saving()) {
+            if(const auto result=store->takeSaveResult()) { finishSnapshot(*result);break; }
             const auto input=window.poll();if(input.resized) renderer.requestResize();
             window.title("VoxelCraft: saving world");if(!renderer.draw(camera)) vc::Window::idle();
         }
     };
     const auto save=[&](bool waitForCompletion=false) {
         if(!store) { notify("TEMPORARY WORLD - SAVING DISABLED");return; }
-        if(snapshotWriter->busy()) {
+        if(store->saving()) {
             if(waitForCompletion) awaitSnapshot();
             else { notify("SAVE ALREADY IN PROGRESS");return; }
         }
@@ -225,7 +224,7 @@ int run(const vc::client::Options& options) {
         state.mods=mods.save();
         if(savedPlayer) state.profiles=savedPlayer->profiles;
         const auto gameData=vc::encodePlayer(state);
-        if(!snapshotWriter->request(streamer?streamer->snapshot():world,registry,metadata,gameData)) throw std::logic_error("Snapshot request unexpectedly busy");
+        if(!store->requestSave(streamer?streamer->snapshot():world,registry,metadata,gameData)) throw std::logic_error("Snapshot request unexpectedly busy");
         notify("SAVING WORLD");if(waitForCompletion) awaitSnapshot();
     };
     const auto commandContext=[&](auto& hotbar,auto& selected) {
@@ -236,7 +235,7 @@ int run(const vc::client::Options& options) {
         context.sample=[&](auto position) { return streamer?streamer->sample(position):world.loaded(position)?world.block(position):generator.sample(position); };
         context.save=[&] {
             if(!store) return vc::commands::Result::error(vc::commands::Code::Unavailable,"Saving is disabled in this temporary world");
-            if(snapshotWriter->busy()) return vc::commands::Result::error(vc::commands::Code::Unavailable,"Save already in progress");
+            if(store->saving()) return vc::commands::Result::error(vc::commands::Code::Unavailable,"Save already in progress");
             save();return vc::commands::Result::ok("World save queued");
         };
         context.broadcast=[&](std::string_view message) { notify(std::string(message)); };
@@ -263,7 +262,7 @@ int run(const vc::client::Options& options) {
     while (true) {
         const auto updateStart=vc::Window::seconds();
         auto input = window.poll();
-        if(snapshotWriter) if(const auto result=snapshotWriter->takeReady()) {
+        if(store) if(const auto result=store->takeSaveResult()) {
             try { finishSnapshot(*result); }
             catch(const std::exception& error) { vc::log(std::string("Save failed; world remains in memory: ")+error.what());notify("SAVE FAILED - F5 RETRY - CTRL SHIFT Q QUIT"); }
         }

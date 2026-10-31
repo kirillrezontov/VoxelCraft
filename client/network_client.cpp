@@ -1,4 +1,5 @@
 #include "client/network_client.hpp"
+#include "client/core_modules.hpp"
 #include "client/preferences.hpp"
 #include "engine/core/log.hpp"
 #include "engine/platform/window.hpp"
@@ -67,7 +68,7 @@ int runRemote(const Options& options) {
     SandboxUiController ui(inventory,preferences.settings,survivalMode?&survivalUi:nullptr);Camera camera=welcome.profile.camera;
     camera.fieldOfView=static_cast<float>(preferences.settings.fieldOfView);camera.mouseSensitivity=preferences.settings.mouseSensitivity;camera.invertY=preferences.settings.invertY;
     ui.setCompletionContext({commands::Permission::Player,&items,{welcome.profile.name}});
-    LivingWorld living(welcome.metadata.seed);DayCycle day(welcome.worldTime);voxel::Lighting lighting;voxel::BackgroundMeshQueue meshes(blocks,atlas);
+    LivingWorld living(welcome.metadata.seed);DayCycle day(welcome.worldTime);voxel::Lighting lighting;CoreBackgroundMeshQueue meshes(blocks,atlas);
     std::vector<Mesh> models;for(auto& model:builtinCreatureModels()) models.push_back(std::move(model));models.push_back(playerAvatarModel());renderer.setModels(models);
     std::map<std::uint64_t,Avatar> avatars;
     auto lastHotbar=inventory.names(blocks);auto lastSlot=inventory.selectedSlot();

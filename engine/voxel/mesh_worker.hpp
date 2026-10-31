@@ -5,20 +5,24 @@
 #include <condition_variable>
 #include <deque>
 #include <exception>
+#include <map>
 #include <mutex>
 #include <optional>
+#include <set>
+#include <span>
 #include <thread>
 
 namespace vc::voxel {
 struct CompletedMesh { Position position;std::uint64_t ticket{};Mesh mesh; };
 // Single producer owns World/Lighting. Jobs copy only the center and six face
 // neighbors plus relevant light columns. No world references cross threads.
-class MeshWorker {
+template<ChunkMesher Mesher>
+class BasicMeshWorker {
 public:
-    MeshWorker(BlockRegistry registry,AtlasLayout atlas,std::size_t capacity=4);
-    ~MeshWorker()=default;
-    MeshWorker(const MeshWorker&)=delete;
-    MeshWorker& operator=(const MeshWorker&)=delete;
+    BasicMeshWorker(BlockRegistry registry,AtlasLayout atlas,std::size_t capacity=4);
+    ~BasicMeshWorker()=default;
+    BasicMeshWorker(const BasicMeshWorker&)=delete;
+    BasicMeshWorker& operator=(const BasicMeshWorker&)=delete;
     bool request(const World& world,Position chunk,std::uint64_t ticket,const Lighting* lighting=nullptr);
     std::optional<CompletedMesh> takeReady();
     std::size_t pendingCount() const;
@@ -41,9 +45,10 @@ private:
 
 // Main-thread coordinator: near-first snapshots, version-checked results, and
 // immediate GPU removals. Invalidations supersede queued/in-flight geometry.
-class BackgroundMeshQueue {
+template<ChunkMesher Mesher>
+class BasicBackgroundMeshQueue {
 public:
-    BackgroundMeshQueue(const BlockRegistry& registry,const AtlasLayout& atlas,std::size_t capacity=4);
+    BasicBackgroundMeshQueue(const BlockRegistry& registry,const AtlasLayout& atlas,std::size_t capacity=4);
     WorkMetrics metrics() const { return worker_.metrics(); }
     void collect(World& world);
     void invalidate(std::span<const Position> chunks);
@@ -53,6 +58,13 @@ private:
     std::set<Position> pending_;
     std::map<Position,std::uint64_t> tickets_,inFlight_;
     std::uint64_t nextTicket_{};
-    MeshWorker worker_;
+    BasicMeshWorker<Mesher> worker_;
 };
+using MeshWorker = BasicMeshWorker<GreedyChunkMesher>;
+extern template class BasicMeshWorker<GreedyChunkMesher>;
+extern template class BasicMeshWorker<CulledChunkMesher>;
+using BackgroundMeshQueue = BasicBackgroundMeshQueue<GreedyChunkMesher>;
+extern template class BasicBackgroundMeshQueue<GreedyChunkMesher>;
+extern template class BasicBackgroundMeshQueue<CulledChunkMesher>;
 }
+#include "engine/voxel/mesh_worker_impl.hpp"

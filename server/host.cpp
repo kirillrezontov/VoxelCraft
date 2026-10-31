@@ -3,7 +3,7 @@
 #include "engine/core/log.hpp"
 #include "engine/core/paths.hpp"
 #include "engine/voxel/streaming.hpp"
-#include "engine/voxel/snapshot_writer.hpp"
+#include "engine/voxel/persistence.hpp"
 #include "game/content/blocks.hpp"
 #include "game/gameplay/interaction.hpp"
 #include "game/player/controller.hpp"
@@ -53,8 +53,7 @@ struct Host::Impl {
     std::uint64_t fingerprint{},tickCount{},nextPlayer{1};
     voxel::WorldMetadata metadata;
     voxel::World world;
-    std::unique_ptr<voxel::WorldStore> store;
-    std::unique_ptr<voxel::SnapshotWriter> writer;
+    std::unique_ptr<voxel::WorldPersistence> store;
     PlayerSaveState base;
     std::optional<voxel::TerrainGenerator> generator;
     std::unique_ptr<voxel::ChunkStreamer> streamer;
@@ -81,7 +80,7 @@ struct Host::Impl {
         metadata.generatorVersion=config.generatorVersion.value_or(voxel::terrainGenerationVersion);
         bool loaded=false,hasPlayer=false;
         if(config.worldDirectory) {
-            store=std::make_unique<voxel::WorldStore>(*config.worldDirectory);
+            store=std::make_unique<voxel::WorldPersistence>(*config.worldDirectory);
             if(auto archive=store->load(blocks)) {
                 if(config.seed&&*config.seed!=archive->metadata.seed) throw std::invalid_argument("Server seed differs from the saved world");
                 if((config.minY&&*config.minY!=archive->metadata.bounds.minY)||(config.maxY&&*config.maxY!=archive->metadata.bounds.maxY))
@@ -117,7 +116,6 @@ struct Host::Impl {
         living=std::make_unique<LivingWorld>(metadata.seed);living->restore(base.actors,items);
         std::vector<voxel::Position> retained;for(const auto& [p,chunk]:world.chunks()) { (void)chunk;retained.push_back(p); }
         streamer=std::make_unique<voxel::ChunkStreamer>(world,*generator,config.radius);streamer->retain(retained);
-        if(store) writer=std::make_unique<voxel::SnapshotWriter>(*store);
         streamer->tick(cell(anchor.camera.position),4);listener=std::make_unique<net::TcpListener>(config.bindAddress,config.port);
         log("Server listening on "+config.bindAddress+':'+std::to_string(listener->port())+"; content "+std::to_string(fingerprint));
     }
@@ -212,8 +210,8 @@ struct Host::Impl {
             context.players.push_back({connection.profile->name,&connection.player,&connection.survival,&connection.survivalMode,
                 &connection.profile->hotbar,&connection.profile->selectedSlot,&connection.profile->spawnPoint,&connection.poseRevision,permission(connection)});
         context.save=[this] {
-            if(!writer) return commands::Result::error(commands::Code::Unavailable,"Temporary world: saving disabled");
-            if(writer->busy()) return commands::Result::error(commands::Code::Unavailable,"Save already in progress");
+            if(!store) return commands::Result::error(commands::Code::Unavailable,"Temporary world: saving disabled");
+            if(store->saving()) return commands::Result::error(commands::Code::Unavailable,"Save already in progress");
             if(elapsed-lastRequestedSave<5) return commands::Result::error(commands::Code::Unavailable,"Save requested too recently");
             saveRequested=true;lastRequestedSave=elapsed;return commands::Result::ok("World snapshot queued");
         };
@@ -469,8 +467,8 @@ struct Host::Impl {
         log("Server saved world revision "+std::to_string(result.revision)+" in "+std::to_string(result.milliseconds)+" ms to "+pathText(store->directory()));
     }
     void pollSave() {
-        if(!writer) return;
-        if(const auto result=writer->takeReady()) {
+        if(!store) return;
+        if(const auto result=store->takeSaveResult()) {
             try { completed(*result);broadcast("Saved world "+std::to_string(result->revision)); }
             catch(const std::exception& error) {
                 log(std::string("Server save failed; changes remain in memory: ")+error.what());
@@ -479,22 +477,22 @@ struct Host::Impl {
         }
     }
     void requestSave() {
-        if(!writer) { broadcast("Temporary server - saving disabled");return; }
-        if(writer->busy()) { broadcast("Save already in progress");return; }
+        if(!store) { broadcast("Temporary server - saving disabled");return; }
+        if(store->saving()) { broadcast("Save already in progress");return; }
         const auto data=snapshotData();
-        if(!writer->request(streamer->snapshot(),blocks,metadata,data)) throw std::logic_error("Server snapshot unexpectedly busy");
+        if(!store->requestSave(streamer->snapshot(),blocks,metadata,data)) throw std::logic_error("Server snapshot unexpectedly busy");
         lastSave=elapsed;broadcast("Saving world");
     }
     std::uint64_t save() {
-        if(!writer) return 0;
-        if(writer->busy()) {
-            const auto previous=writer->wait();
+        if(!store) return 0;
+        if(store->saving()) {
+            const auto previous=store->waitForSave();
             try { completed(previous); }
             catch(const std::exception& error) { log(std::string("Previous asynchronous save failed; retrying current snapshot: ")+error.what()); }
         }
         const auto data=snapshotData();
-        if(!writer->request(streamer->snapshot(),blocks,metadata,data)) throw std::logic_error("Server final snapshot unexpectedly busy");
-        const auto result=writer->wait();completed(result);return result.revision;
+        if(!store->requestSave(streamer->snapshot(),blocks,metadata,data)) throw std::logic_error("Server final snapshot unexpectedly busy");
+        const auto result=store->waitForSave();completed(result);return result.revision;
     }
     void tick(double seconds) {
         if(!std::isfinite(seconds)||seconds<=0||seconds>0.1) throw std::invalid_argument("Server tick must be finite and within (0,0.1]");
