@@ -1,5 +1,5 @@
 #pragma once
-#include "engine/renderer/texture.hpp"
+#include "engine/core/resource_types.hpp"
 #include <optional>
 #include <string>
 #include <string_view>

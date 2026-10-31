@@ -14,7 +14,7 @@
 #include "engine/voxel/mesh_worker.hpp"
 #include "engine/voxel/lighting.hpp"
 #include "engine/voxel/mesher.hpp"
-#include "game/content/blocks.hpp"
+#include "game/content/services.hpp"
 #include "game/content/atlas.hpp"
 #include "game/content/creature_models.hpp"
 #include "game/player/controller.hpp"
@@ -48,12 +48,12 @@ int run(const vc::client::Options& options) {
     const auto preferences=vc::client::loadPreferences(options);
     const auto settings=preferences.settings;const auto settingsFile=preferences.path;
     const double generationStart = vc::Window::seconds();
-    auto registry = vc::builtinBlocks();
     // Register content before WorldStore resolves saved names into runtime IDs.
     auto modsDirectory=options.modsDirectory;
     if(modsDirectory.empty()&&!options.noMods&&!options.smoke&&!options.frameLimit)
         modsDirectory=vc::Window::userDataPath()/"mods";
-    vc::ModRuntime mods(modsDirectory,registry);
+    vc::ContentServices content(modsDirectory);
+    auto& registry=content.blocks();auto& mods=content.mods();
     const auto atlas=mods.atlas().layout();
     vc::VulkanRenderer renderer(window,mods.atlas().image(),options.requireValidation,options.vsync);
     vc::log("Loaded "+std::to_string(mods.size())+" mods");
@@ -170,8 +170,8 @@ int run(const vc::client::Options& options) {
         }
     }
     const std::array materials{registry.require("voxelcraft:grass"), registry.require("voxelcraft:dirt"), registry.require("voxelcraft:stone")};
-    auto items=vc::builtinItems(registry);
-    auto recipes=vc::builtinRecipes(items);mods.installItems(items,registry,recipes);
+    content.rebuildGameplay();
+    auto& items=content.items();auto& recipes=content.recipes();
     if(savedPlayer) vc::retainHotbarItems(items,savedPlayer->hotbar);
     vc::CreativeInventory inventory(items);
     if(savedPlayer) inventory.restore(savedPlayer->hotbar,savedPlayer->selectedSlot,registry);
@@ -183,7 +183,7 @@ int run(const vc::client::Options& options) {
     if(savedPlayer) { survival.inventory.restore(savedPlayer->items,savedPlayer->selectedSlot,items);survival.restoreHealth(savedPlayer->health); }
     if(savedPlayer) living.restore(savedPlayer->actors,items);
     renderer.setModels(vc::builtinCreatureModels());
-    vc::MiningRules miningRules(registry,items);mods.installMining(miningRules,registry,items);
+    auto& miningRules=content.mining();
     vc::SurvivalUiContext survivalUi{&survival,&items,&recipes};
     vc::DayCycle day(options.timeOfDay?*options.timeOfDay*vc::DayCycle::length:(savedPlayer?savedPlayer->worldTime:300));
     auto material=inventory.selectedBlock().value_or(vc::voxel::air);

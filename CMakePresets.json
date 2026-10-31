@@ -140,7 +140,7 @@
       "configurePreset": "tsan",
       "filter": {
         "include": {
-          "name": "^(TerrainWorker|MeshWorker|BackgroundMeshing|SnapshotWriter)\\."
+          "name": "^(CoreModule|TerrainWorker|MeshWorker|BackgroundMeshing|SnapshotWriter)\\."
         }
       },
       "environment": {

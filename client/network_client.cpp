@@ -8,7 +8,7 @@
 #include "game/network/identity.hpp"
 #include "engine/voxel/raycast.hpp"
 #include "engine/voxel/streaming.hpp"
-#include "game/content/blocks.hpp"
+#include "game/content/services.hpp"
 #include "game/content/creature_models.hpp"
 #include "game/gameplay/inventory.hpp"
 #include "game/modding/runtime.hpp"
@@ -40,11 +40,10 @@ void shutdown(VulkanRenderer& renderer) {
 }
 }
 int runRemote(const Options& options) {
-    Window window(options.width,options.height,options.fullscreen);const auto preferences=loadPreferences(options);auto blocks=builtinBlocks();auto directory=options.modsDirectory;
+    Window window(options.width,options.height,options.fullscreen);const auto preferences=loadPreferences(options);auto directory=options.modsDirectory;
     if(directory.empty()&&!options.noMods&&!options.frameLimit) directory=Window::userDataPath()/"mods";
-    ModRuntime mods(directory,blocks);const auto atlas=mods.atlas().layout();
-    auto items=builtinItems(blocks);auto recipes=builtinRecipes(items);mods.installItems(items,blocks,recipes);
-    MiningRules mining(blocks,items);mods.installMining(mining,blocks,items);
+    ContentServices content(directory);auto& blocks=content.blocks();auto& mods=content.mods();const auto atlas=mods.atlas().layout();
+    auto& items=content.items();auto& recipes=content.recipes();auto& mining=content.mining();
     const auto fingerprint=netgame::contentFingerprint(blocks,items,recipes,mining,mods);
     VulkanRenderer renderer(window,mods.atlas().image(),options.requireValidation,options.vsync);
     netgame::RemoteSession session(options.connectHost,options.connectPort,options.playerName,fingerprint,blocks,options.identityFile.empty()?std::string{}:netgame::readIdentityToken(options.identityFile));
@@ -60,7 +59,7 @@ int runRemote(const Options& options) {
     bool survivalMode=welcome.survival;
     std::uint64_t poseRevision=0;
     if(survivalMode&&options.fly) throw std::invalid_argument("Flight is disabled by this survival server");
-    items=builtinItems(blocks);recipes=builtinRecipes(items);mods.installItems(items,blocks,recipes);
+    content.rebuildGameplay();
     CreativeInventory inventory(items);inventory.restore(welcome.profile.hotbar,welcome.profile.selectedSlot,blocks);
     SurvivalState survival;survival.inventory.restore(welcome.profile.items,welcome.profile.selectedSlot,items);survival.restoreHealth(welcome.profile.health);
     SurvivalUiContext survivalUi{&survival,&items,&recipes,[&](InventoryAction action){session.inventory(action);}};

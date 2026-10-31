@@ -4,7 +4,7 @@
 #include "engine/core/paths.hpp"
 #include "engine/voxel/streaming.hpp"
 #include "engine/voxel/snapshot_writer.hpp"
-#include "game/content/blocks.hpp"
+#include "game/content/services.hpp"
 #include "game/gameplay/interaction.hpp"
 #include "game/player/controller.hpp"
 #include "game/player/save_state.hpp"
@@ -43,13 +43,14 @@ struct Connection {
 }
 struct Host::Impl {
     HostConfig config;
-    voxel::BlockRegistry blocks=builtinBlocks();
-    std::unique_ptr<ModRuntime> mods;
+    ContentServices content;
+    voxel::BlockRegistry& blocks=content.blocks();
+    ModRuntime& mods=content.mods();
     commands::Registry commandRegistry=commands::builtinCommands();
     std::unique_ptr<commands::PermissionStore> permissions;
-    ItemRegistry items;
-    std::vector<Recipe> recipes;
-    std::optional<MiningRules> mining;
+    ItemRegistry& items=content.items();
+    std::vector<Recipe>& recipes=content.recipes();
+    MiningRules& mining=content.mining();
     std::uint64_t fingerprint{},tickCount{},nextPlayer{1};
     voxel::WorldMetadata metadata;
     voxel::World world;
@@ -67,7 +68,7 @@ struct Host::Impl {
     bool warmed{},saveRequested{};
     double elapsed{},lastSave{},lastRequestedSave{-100};
 
-    explicit Impl(HostConfig settings):config(std::move(settings)) {
+    explicit Impl(HostConfig settings):config(std::move(settings)),content(config.modsDirectory) {
         if(config.radius<1||config.radius>6) throw std::invalid_argument("Server radius must be 1..6 chunks");
         if(config.profileTokens.empty()&&!config.trustedLan&&config.bindAddress!="127.0.0.1"&&config.bindAddress!="::1")
             throw std::invalid_argument("Non-loopback hosting requires --auth-file or explicit --trusted-lan (trusted private networks only)");
@@ -75,8 +76,7 @@ struct Host::Impl {
             if(!validPlayerName(name)||name!=playerNameKey(name)||!netgame::validIdentityToken(token))
                 throw std::invalid_argument("Invalid configured profile identity");
         if(config.profileTokens.size()>maxSavedProfiles) throw std::invalid_argument("Too many configured profile identities");
-        mods=std::make_unique<ModRuntime>(config.modsDirectory,blocks);installContent();
-        fingerprint=netgame::contentFingerprint(blocks,items,recipes,*mining,*mods);
+        fingerprint=netgame::contentFingerprint(blocks,items,recipes,mining,mods);
         metadata.seed=config.seed.value_or(12345);metadata.bounds={config.minY.value_or(-512),config.maxY.value_or(511)};
         metadata.generatorVersion=config.generatorVersion.value_or(voxel::terrainGenerationVersion);
         bool loaded=false,hasPlayer=false;
@@ -97,10 +97,10 @@ struct Host::Impl {
             throw std::invalid_argument("Unsupported server world bounds/generator");
         base.survival=config.survival.value_or(base.survival);
         if(!loaded) world=voxel::World(metadata.bounds);
-        mods->restore(base.mods);
+        mods.restore(base.mods);
         for(const auto& profile:base.profiles) savedProfiles.emplace(playerNameKey(profile.name),profile);
         if(blocks.size()>netgame::maxNetworkBlocks) throw std::runtime_error("Server block palette exceeds 8192 entries");
-        installContent();retainHotbarItems(items,base.hotbar);
+        content.rebuildGameplay();retainHotbarItems(items,base.hotbar);
         for(const auto& [key,profile]:savedProfiles) { (void)key;retainHotbarItems(items,profile.hotbar); }
         auto permissionFile=config.permissionsFile;
         if(permissionFile.empty()&&config.worldDirectory) permissionFile=*config.worldDirectory/"operators.vcp";
@@ -120,10 +120,6 @@ struct Host::Impl {
         if(store) writer=std::make_unique<voxel::SnapshotWriter>(*store);
         streamer->tick(cell(anchor.camera.position),4);listener=std::make_unique<net::TcpListener>(config.bindAddress,config.port);
         log("Server listening on "+config.bindAddress+':'+std::to_string(listener->port())+"; content "+std::to_string(fingerprint));
-    }
-    void installContent() {
-        items=builtinItems(blocks);recipes=builtinRecipes(items);mods->installItems(items,blocks,recipes);
-        mining.emplace(blocks,items);mods->installMining(*mining,blocks,items);
     }
     std::size_t count() const {
         return static_cast<std::size_t>(std::count_if(connections.begin(),connections.end(),[](const auto& c){return c.id&&!c.closing&&c.channel.open();}));
@@ -322,8 +318,8 @@ struct Host::Impl {
     }
     void dispatch(const ModEvent& event,const PlayerController& player,SurvivalState* survival=nullptr) {
         const auto occupied=bodies();
-        for(const auto& message:mods->dispatch(event,{world,blocks,items,survival,player.bounds(),occupied})) { log(message);broadcast(message); }
-        for(const auto& message:mods->takeDiagnostics()) { log(message);broadcast(message); }
+        for(const auto& message:mods.dispatch(event,{world,blocks,items,survival,player.bounds(),occupied})) { log(message);broadcast(message); }
+        for(const auto& message:mods.takeDiagnostics()) { log(message);broadcast(message); }
     }
     void simulatePlayer(Connection& connection,double seconds) {
         auto& player=connection.player;auto& survival=connection.survival;
@@ -364,7 +360,7 @@ struct Host::Impl {
         bool changed=false;
         const auto broken=hit?blocks.definition(world.block(hit->block)).identifier:std::string{};
         if(connection.survivalMode) {
-            const auto result=survival.mine(playing&&!actor&&(connection.input.flags&netgame::AttackHeld),hit,seconds,world,items,*mining);
+            const auto result=survival.mine(playing&&!actor&&(connection.input.flags&netgame::AttackHeld),hit,seconds,world,items,mining);
             changed=result.changed;
             if(result.inventoryFull) text(connection,netgame::Message::Notice,"Inventory full - mining stopped");
             if(result.toolBroke) text(connection,netgame::Message::Notice,"Tool broke");
@@ -460,7 +456,7 @@ struct Host::Impl {
     }
     std::string snapshotData() {
         for(auto& connection:connections) remember(connection);
-        auto state=base;state.worldTime=day.seconds();state.actors=living->save(items);state.mods=mods->save();state.profiles.clear();
+        auto state=base;state.worldTime=day.seconds();state.actors=living->save(items);state.mods=mods.save();state.profiles.clear();
         for(const auto& [key,profile]:savedProfiles) { (void)key;state.profiles.push_back(profile); }
         return encodePlayer(state);
     }

@@ -1,7 +1,7 @@
 #pragma once
 #include <glm/vec3.hpp>
 #include "engine/core/content_presentation.hpp"
-#include "engine/renderer/texture.hpp"
+#include "engine/core/resource_types.hpp"
 #include <array>
 #include <cstdint>
 #include <map>
