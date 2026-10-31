@@ -1,5 +1,25 @@
 # VoxelCraft Development Roadmap
 
+## Next-generation architecture program
+
+- [x] Preserve the recovered baseline merged at `82d7f28`
+- [x] Separate world storage, generation, streaming, lighting, meshing and collision targets
+- [x] Concrete shared content ownership/rebuild contract and protocol/modding separation
+- [x] Tested compile-time terrain worker policy and executable alternate-terrain example
+- [x] Document current ownership, dependencies and the ClientApplication/GameSession handoff
+- [ ] Milestone 2: application/session split and return to main menu in one process
+- [ ] Milestone 3: versioned Native Mod SDK and extension foundation
+- [ ] Milestone 4: independent VoxelUI Vulkan backend
+- [ ] Milestone 5: original SVG design system
+- [ ] Milestone 6: complete functional VoxelUI integration
+- [ ] Milestone 7: verified legacy UI removal
+- [ ] Milestone 8: cross-platform hardening and release preparation
+
+Milestone 1's executed verification and limitations are recorded in
+[modularization progress](docs/modularization-progress.md). Later milestones have
+not been implemented by this refactor. Windows/MSVC and sustained human gameplay
+acceptance remain separate gates.
+
 ## Current Milestone: v0.8.2 — UI/UX and Developer Console (release candidate)
 
 - [x] Baseline audit/build and 185-test regression baseline

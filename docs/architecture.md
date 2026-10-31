@@ -1,5 +1,11 @@
 # Architecture: viewer, interaction and persistent sandbox
 
+The implemented Milestone 1 target boundaries and lifecycle contracts are now
+specified in [modular architecture](modular-architecture.md) and
+[module dependency graph](module-dependency-graph.md). This document retains the
+underlying gameplay/storage/rendering design; its historical directory table is
+not the current CMake target graph.
+
 `client/main.cpp` composes local play; shared CLI/preferences and the connected
 loop live in `client/options.*`, `preferences.*`, and `network_client.*`.
 `server/main.cpp` composes the headless host and console lifecycle.

@@ -1,5 +1,23 @@
 # Building
 
+The [module graph](module-dependency-graph.md) documents the CPU-only engine and
+headless boundaries. To run the real compile-time generator alternative without
+desktop dependencies:
+
+```sh
+cmake --preset server
+cmake --build --preset server --target vc_core_module_tests vc_core_module_example
+ctest --test-dir build/server -R '^CoreModule\.' --output-on-failure --no-tests=error
+```
+
+`vc_text` remains an alias for `vc_core`; callers previously inheriting generation,
+meshing or streaming through `vc_voxel` must link the corresponding target explicitly.
+Code constructing `ModRuntime` must include `game/modding/runtime.hpp`; content
+fingerprinting is provided by `vc_game_content`, independently of packet codecs.
+The dedicated-server executable can be built on its own with `VC_BUILD_CLIENT=OFF`
+and `BUILD_TESTING=OFF`, without discovering SDL/Vulkan or compiling UI/meshing.
+Exact current results are in [Milestone 1 verification](modularization-progress.md).
+
 ## Dependency policy
 
 CMake FetchContent pins SDL to `release-3.2.10`, GLM to `1.0.1`, and GoogleTest to

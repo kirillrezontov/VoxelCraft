@@ -1,5 +1,11 @@
 # VoxelCraft — v0.8.2 release candidate
 
+The modular-core work preserves the playable v0.8.2 game and legacy UI. See the
+[implemented architecture](docs/modular-architecture.md), [module graph](docs/module-dependency-graph.md),
+[compile-time generation example](docs/core-extension-points.md), and
+[Milestone 1 verification](docs/modularization-progress.md). ClientApplication/GameSession,
+the Native Mod SDK, VoxelUI Vulkan backend and UI redesign/migration are future work.
+
 A C++23, SDL3 and Vulkan 1.3 voxel sandbox foundation. Windows is the primary release
 target; development and hardware rendering verification currently run on Linux.
 
