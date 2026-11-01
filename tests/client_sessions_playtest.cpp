@@ -41,8 +41,11 @@ int main(int argc,char** argv) {
         require(!std::filesystem::exists(config.worldDirectory),"Main menu touched a world directory");
         until([&] { return app.renderer().draw(vc::Camera{},captures/"main-menu.ppm"); },tick);
         auto* nativeWindow=SDL_GetWindowFromID(app.windowId());
+        // Settle the initial Wayland configure/focus before requesting minimize.
+        for(int i=0;i<8;++i) { SDL_PumpEvents();tick();vc::Window::idle(); }
         require(nativeWindow&&SDL_MinimizeWindow(nativeWindow),"Could not minimize menu window");
         until([&] { return (SDL_GetWindowFlags(nativeWindow)&SDL_WINDOW_MINIMIZED)!=0; },[&] { SDL_PumpEvents();tick(); });
+        std::cout<<"Menu minimized\n"<<std::flush;
         tick(); // A zero-sized menu must not create invalid font/layout geometry.
         require(SDL_RestoreWindow(nativeWindow)&&SDL_RaiseWindow(nativeWindow),"Could not restore menu window");
         until([&] { return (SDL_GetWindowFlags(nativeWindow)&SDL_WINDOW_MINIMIZED)==0; },[&] { SDL_PumpEvents();tick(); });
