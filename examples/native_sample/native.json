@@ -1,0 +1,7 @@
+{
+  "id": "native_sample",
+  "version": "1.0.0",
+  "abi": 1,
+  "library": {"linux": "native_sample.so", "windows": "native_sample.dll"},
+  "dependencies": {}
+}

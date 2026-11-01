@@ -9,6 +9,7 @@ namespace vc::server {
 struct HostConfig {
     std::optional<std::filesystem::path> worldDirectory;
     std::filesystem::path modsDirectory;
+    std::filesystem::path nativeModsDirectory;
     std::optional<std::uint64_t> seed;
     std::optional<std::int64_t> minY,maxY;
     std::optional<std::uint32_t> generatorVersion;

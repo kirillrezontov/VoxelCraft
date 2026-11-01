@@ -9,7 +9,7 @@ namespace vc {
 // and numeric item IDs must not be kept across rebuildGameplay(). Main thread only.
 class ContentServices {
 public:
-    explicit ContentServices(const std::filesystem::path& modsDirectory = {});
+    explicit ContentServices(const std::filesystem::path& modsDirectory = {},const std::filesystem::path& trustedNativeRoot = {});
     ContentServices(const ContentServices&) = delete;
     ContentServices& operator=(const ContentServices&) = delete;
     voxel::BlockRegistry& blocks() { return blocks_; }

@@ -12,6 +12,8 @@ int main(int argc, char** argv) {
                 "--width N --height N --fullscreen / --windowed --vsync / --no-vsync\n"
                 "--world-dir PATH (create/load a saved world) --no-save (temporary world)\n"
                 "--connect HOST[:PORT] --name PLAYER --identity-file PATH (multiplayer; server controls world and game mode)\n"
+                "--native-mods PATH (explicit trusted DLL/SO loading; process privileges)\n"
+                "--resource-pack PATH (repeatable declarative resource providers)\n"
                 "--mods-dir PATH (load mod packs) --no-mods (retain saved mod data without loading packs)\n"
                 "--survival (quantities, crafting, mining and health) --creative (infinite blocks and flight)\n"
                 "--generator-version 1..3 (new worlds only; saved worlds retain their version)\n"

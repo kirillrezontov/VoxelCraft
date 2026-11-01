@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-01",
+  "starting_commit": "e8bab9d",
+  "source_status": "Working-source implementation; final committed-source gate pending",
+  "results": {
+    "cpu": {
+      "passed": 247,
+      "total": 247
+    },
+    "installed_sdk_game": "Passed: standalone SDK consumer executes actual ClientApplication, native command/data block/resource override/save/shutdown",
+    "core_example_game": "Passed: example mesher 120-frame real Vulkan smoke, 0 validation errors/warnings"
+  },
+  "sanitizers": "Pending final gate",
+  "limits": [
+    "Windows/MSVC not executed",
+    "No arbitrary hot unloading or native sandbox",
+    "SDK 1.0 provides content, commands and coarse events; no native UI/actor/GPU job API",
+    "Data/Lua packs cannot declare native dependencies",
+    "Legacy UI remains active until verified migration",
+    "No native mutable state serialization API; existing opaque save records retained"
+  ]
+}

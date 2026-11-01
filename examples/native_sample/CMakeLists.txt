@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.25)
+project(VoxelCraftNativeSample LANGUAGES CXX)
+if(NOT TARGET VoxelCraft::mod_sdk_cpp)
+    find_package(VoxelCraftModSDK 1 CONFIG REQUIRED)
+endif()
+add_library(vc_native_sample MODULE sample.cpp)
+target_link_libraries(vc_native_sample PRIVATE VoxelCraft::mod_sdk_cpp)
+set(vc_sample_directory "${CMAKE_CURRENT_BINARY_DIR}/pack/$<CONFIG>/native_sample")
+set_target_properties(vc_native_sample PROPERTIES PREFIX "" OUTPUT_NAME native_sample
+    RUNTIME_OUTPUT_DIRECTORY "${vc_sample_directory}" LIBRARY_OUTPUT_DIRECTORY "${vc_sample_directory}")
+file(GENERATE OUTPUT "${vc_sample_directory}/native.json" INPUT "${CMAKE_CURRENT_SOURCE_DIR}/native.json")

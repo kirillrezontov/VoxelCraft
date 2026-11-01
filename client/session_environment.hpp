@@ -2,6 +2,7 @@
 #include "client/game_session.hpp"
 #include "client/screen_manager.hpp"
 #include "client/preferences.hpp"
+#include "engine/ui/widgets.hpp"
 #include "engine/platform/window.hpp"
 #include "engine/renderer/vulkan_renderer.hpp"
 #include <coroutine>
@@ -13,6 +14,7 @@ struct SessionEnvironment {
     VulkanRenderer& renderer;
     Preferences& preferences;
     ScreenManager& screens;
+    const ui::Theme& theme;
     Input input;
     bool leaveRequested{}, quitRequested{}, presented{};
     struct NextFrame {

@@ -5,6 +5,7 @@
 #include "engine/network/address.hpp"
 #include "engine/ui/widgets.hpp"
 #include "game/content/atlas.hpp"
+#include "game/ui/resource_theme.hpp"
 #include "game/player/profile.hpp"
 #include "game/player/camera.hpp"
 #include <algorithm>
@@ -24,6 +25,8 @@ struct ClientApplication::Impl {
     Options options;
     Window window;
     Preferences preferences;
+    ResourceCatalog resources;
+    ui::Theme theme;
     VulkanRenderer renderer;
     ScreenManager screens;
     SessionEnvironment host;
@@ -37,14 +40,24 @@ struct ClientApplication::Impl {
     GameSession session; // Destroy first, before every borrowed application owner.
 
     explicit Impl(Options config):options(std::move(config)),window(options.width,options.height,options.fullscreen),
-        preferences(loadPreferences(options)),renderer(window,builtinAtlas(),options.requireValidation,options.vsync),
-        host{window,renderer,preferences,screens,{},false,false,false} {
+        preferences(loadPreferences(options)),resources(window.assetPath()/"resources"),renderer(window,builtinAtlas(),options.requireValidation,options.vsync),
+        host{window,renderer,preferences,screens,theme,{},false,false,false} {
         address.set(options.connectHost.empty()?"127.0.0.1:25565":
             (options.connectHost.find(':')!=std::string::npos?"["+options.connectHost+"]":options.connectHost)+":"+std::to_string(options.connectPort));
         name.set(options.playerName);resetInput();
+        try { activate(options.resourcePacks); }
+        catch(const std::exception& error) { log(std::string("Invalid resource pack; using builtin: ")+error.what());activate({}); }
         log("ClientApplication ready: main menu without a world");
     }
     void resetInput() { window.capture(false);window.pointerMode(true);window.textInput(false);window.resetInput(); }
+    void activate(const std::vector<std::filesystem::path>& packs) {
+        if(active) throw std::logic_error("Return to menu before switching resource packs");
+        auto candidate=resources;candidate.activate(packs);std::vector<std::string> diagnostics;
+        const auto next=loadResourceTheme(candidate,diagnostics);
+        for(const auto& error:diagnostics) log(error);
+        for(const auto& error:candidate.takeDiagnostics()) log(error);
+        resources=std::move(candidate);theme=next;options.resourcePacks=packs;dirty=true;
+    }
     void start(Options config,bool remote) {
         if(active) throw std::logic_error("Leave the current session before starting another");
         if(shutdown) throw std::logic_error("Application is shut down");
@@ -84,8 +97,8 @@ struct ClientApplication::Impl {
         }
         if(!dirty) return;
         Mesh colors,text;
-        rectangle(colors,{0,0,static_cast<float>(width),static_cast<float>(height)},{0.035f,0.05f,0.065f,1});
-        rectangle(colors,{left,top,600*scale,540*scale},{0.075f,0.095f,0.115f,1});
+        rectangle(colors,{0,0,static_cast<float>(width),static_cast<float>(height)},glm::vec4(glm::vec3(theme.panel)*0.6f,1));
+        rectangle(colors,{left,top,600*scale,540*scale},theme.panel);
         auto& font=ui::fonts();const auto label=[&](std::string_view value,float x,float y,float pixels,glm::vec3 color=glm::vec3(0.92f)) {
             font.append(text,value,left+x*scale,top+y*scale,pixels*scale,color,{left,top,600*scale,540*scale});
         };
@@ -109,10 +122,10 @@ struct ClientApplication::Impl {
         }
         for(const auto& widget:widgets.widgets()) {
             const bool selected=widget.id==widgets.hovered()||widget.id==widgets.focused();
-            rectangle(colors,widget.bounds,selected?glm::vec4(0.18f,0.30f,0.32f,1):glm::vec4(0.12f,0.16f,0.19f,1));
+            rectangle(colors,widget.bounds,selected?theme.hover:theme.surface);
             const std::string_view value=widget.id=="play"?"Play sandbox":widget.id=="connect"?"Connect":widget.id=="quit"?"Quit":
                 widget.id=="back"?"Back to main menu":widget.id=="address"?std::string_view(address.text()):std::string_view(name.text());
-            font.append(text,value,widget.bounds.x+12*scale,widget.bounds.y+10*scale,20*scale,{0.94f,0.96f,0.98f},widget.bounds);
+            font.append(text,value,widget.bounds.x+12*scale,widget.bounds.y+10*scale,20*scale,glm::vec3(theme.text),widget.bounds);
             if(widget.kind==ui::WidgetKind::TextInput&&widget.id==widgets.focused()) {
                 const auto& editor=widget.id=="address"?address:name;
                 const auto prefix=std::string_view(editor.text()).substr(0,editor.cursor());
@@ -180,6 +193,8 @@ void ClientApplication::requestQuit() { if(impl_->active) impl_->host.quitReques
 bool ClientApplication::hasSession() const { return impl_->active; }
 bool ClientApplication::running() const { return impl_->running; }
 const GameSettings& ClientApplication::settings() const { return impl_->preferences.settings; }
+const ResourceCatalog& ClientApplication::resources() const { return impl_->resources; }
+void ClientApplication::activateResourcePacks(const std::vector<std::filesystem::path>& packs) { impl_->activate(packs); }
 ApplicationScreen ClientApplication::screen() const { return impl_->screens.current(); }
 std::uint32_t ClientApplication::windowId() const { return impl_->window.id(); }
 VulkanRenderer& ClientApplication::renderer() { return impl_->renderer; }

@@ -1,4 +1,5 @@
 #include "game/modding/runtime.hpp"
+#include "game/modding/native_runtime.hpp"
 #include "engine/core/paths.hpp"
 #include "game/content/atlas.hpp"
 #include "game/content/png.hpp"
@@ -288,9 +289,20 @@ struct ModRuntime::Impl {
     std::vector<std::unique_ptr<Script>> scripts;
     std::vector<SavedMod> missing;
     std::vector<std::string> diagnostics;
+    std::unique_ptr<NativeModRuntime> native;
 };
-ModRuntime::ModRuntime(const std::filesystem::path& root,voxel::BlockRegistry& registry):impl_(std::make_unique<Impl>()) {
-    if(root.empty()||!std::filesystem::exists(root)) return;
+ModRuntime::ModRuntime(const std::filesystem::path& root,voxel::BlockRegistry& registry,const std::filesystem::path& nativeRoot):impl_(std::make_unique<Impl>()) {
+    std::optional<voxel::BlockRegistry> original;if(!nativeRoot.empty()) original=registry;
+    const auto loadNative=[&] {
+        if(nativeRoot.empty()) return;
+        std::vector<SavedMod> dataMods;for(const auto& pack:impl_->packs) dataMods.push_back(pack.saved);
+        auto dataItems=builtinItems(registry);auto dataRecipes=builtinRecipes(dataItems);installItems(dataItems,registry,dataRecipes);
+        impl_->native=std::make_unique<NativeModRuntime>(nativeRoot,registry,dataMods,&dataItems);
+        auto checked=builtinItems(registry);auto recipes=builtinRecipes(checked);installItems(checked,registry,recipes);
+        MiningRules mining(registry,checked);installMining(mining,registry,checked);
+    };
+    try {
+    if(root.empty()||!std::filesystem::exists(root)) { loadNative();return; }
     if(!std::filesystem::is_directory(root)) throw std::runtime_error("Mods root is not a directory: "+pathText(root));
     std::map<std::string,Pack,std::less<>> found;
     for(const auto& entry:std::filesystem::directory_iterator(root)) {
@@ -337,6 +349,8 @@ ModRuntime::ModRuntime(const std::filesystem::path& root,voxel::BlockRegistry& r
     }
     auto trial=builtinItems(next);auto recipes=builtinRecipes(trial);installItems(trial,next,recipes);
     MiningRules rules(next,trial);installMining(rules,next,trial);registry=std::move(next);
+    loadNative();
+    } catch(...) { if(original) registry=std::move(*original);throw; }
 }
 ModRuntime::~ModRuntime()=default;
 void ModRuntime::installItems(ItemRegistry& items,const voxel::BlockRegistry& registry,std::vector<Recipe>& recipes) const {
@@ -366,6 +380,7 @@ void ModRuntime::installItems(ItemRegistry& items,const voxel::BlockRegistry& re
             output.push_back(std::move(recipe));
         }
     }
+    if(impl_->native) impl_->native->installItems(next,registry,output);
     if(output.size()>128) throw std::runtime_error("At most 128 total recipes are supported");
     items=std::move(next);recipes=std::move(output);
 }
@@ -393,6 +408,7 @@ void ModRuntime::installMining(MiningRules& rules,const voxel::BlockRegistry& re
 }
 std::vector<SavedMod> ModRuntime::save() const {
     auto saved=impl_->missing;for(const auto& pack:impl_->packs) saved.push_back(pack.saved);
+    if(impl_->native) { auto native=impl_->native->save();saved.insert(saved.end(),native.begin(),native.end()); }
     std::sort(saved.begin(),saved.end(),[](const auto& a,const auto& b){return a.id<b.id;});validateMods(saved);return saved;
 }
 void ModRuntime::restore(const std::vector<SavedMod>& saved) {
@@ -406,6 +422,7 @@ void ModRuntime::restore(const std::vector<SavedMod>& saved) {
         scripts.push_back(std::filesystem::exists(path)?std::make_unique<Script>(path):nullptr);
     }
     for(const auto& mod:saved) {
+        if(impl_->native&&impl_->native->contains(mod.id)) continue;
         const auto found=std::find_if(packs.begin(),packs.end(),[&](const auto& pack){return pack.saved.id==mod.id;});
         if(found==packs.end()) { missing.push_back(mod);diagnostics.push_back("Missing saved mod "+mod.id+" "+mod.version+"; its state/content keys are retained"); }
         else {
@@ -420,7 +437,9 @@ void ModRuntime::restore(const std::vector<SavedMod>& saved) {
             }
         }
     }
-    auto combined=missing;for(const auto& pack:packs) combined.push_back(pack.saved);validateMods(combined);
+    auto combined=missing;for(const auto& pack:packs) combined.push_back(pack.saved);
+    if(impl_->native) { auto native=impl_->native->save();for(auto& record:native) for(const auto& old:saved) if(old.id==record.id) record.state=old.state;combined.insert(combined.end(),native.begin(),native.end()); }
+    validateMods(combined);if(impl_->native) impl_->native->restore(saved);
     impl_->packs=std::move(packs);impl_->missing=std::move(missing);impl_->scripts=std::move(scripts);impl_->diagnostics=std::move(diagnostics);
 }
 std::vector<std::string> ModRuntime::dispatch(const ModEvent& event,ModContext context) {
@@ -440,10 +459,12 @@ std::vector<std::string> ModRuntime::dispatch(const ModEvent& event,ModContext c
         if(exec.inventoryChanged) context.survival->inventory=std::move(exec.inventory);
         pack.saved=std::move(exec.state);for(auto& message:exec.messages) messages.push_back(pack.saved.id+": "+message);
     }
+    if(impl_->native) { auto native=impl_->native->dispatch(event,context);messages.insert(messages.end(),std::make_move_iterator(native.begin()),std::make_move_iterator(native.end())); }
     return messages;
 }
-std::vector<std::string> ModRuntime::takeDiagnostics() { return std::exchange(impl_->diagnostics,{}); }
-std::size_t ModRuntime::size() const { return impl_->packs.size(); }
+void ModRuntime::installCommands(commands::Registry& registry) const { if(impl_->native) impl_->native->installCommands(registry); }
+std::vector<std::string> ModRuntime::takeDiagnostics() { auto result=std::exchange(impl_->diagnostics,{});if(impl_->native) { auto native=impl_->native->diagnostics();result.insert(result.end(),std::make_move_iterator(native.begin()),std::make_move_iterator(native.end())); }return result; }
+std::size_t ModRuntime::size() const { return impl_->packs.size()+(impl_->native?impl_->native->save().size():0); }
 const ContentAtlas& ModRuntime::atlas() const { return impl_->atlas; }
-std::vector<std::string> ModRuntime::order() const { std::vector<std::string> result;for(const auto& pack:impl_->packs) result.push_back(pack.saved.id);return result; }
+std::vector<std::string> ModRuntime::order() const { std::vector<std::string> result;for(const auto& pack:impl_->packs) result.push_back(pack.saved.id);if(impl_->native) for(const auto& pack:impl_->native->save()) result.push_back(pack.id);return result; }
 }

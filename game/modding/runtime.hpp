@@ -7,6 +7,7 @@
 #include <memory>
 
 namespace vc {
+namespace commands { class Registry; }
 enum class ModEventKind { Load,Tick,Place,Break,Craft };
 struct ModEvent {
     ModEventKind kind;
@@ -25,12 +26,13 @@ struct ModContext {
 class ModRuntime {
 public:
     // Empty/nonexistent root loads no mods. Present packs must be valid.
-    ModRuntime(const std::filesystem::path& root,voxel::BlockRegistry& blocks);
+    ModRuntime(const std::filesystem::path& root,voxel::BlockRegistry& blocks,const std::filesystem::path& trustedNativeRoot={});
     ~ModRuntime();
     ModRuntime(const ModRuntime&)=delete;
     ModRuntime& operator=(const ModRuntime&)=delete;
     void installItems(ItemRegistry& items,const voxel::BlockRegistry& blocks,std::vector<Recipe>& recipes) const;
     void installMining(MiningRules& rules,const voxel::BlockRegistry& blocks,const ItemRegistry& items) const;
+    void installCommands(commands::Registry& registry) const;
     void restore(const std::vector<SavedMod>& saved);
     std::vector<SavedMod> save() const;
     std::vector<std::string> dispatch(const ModEvent& event,ModContext context);

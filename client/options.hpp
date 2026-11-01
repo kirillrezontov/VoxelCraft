@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace vc::client {
 struct Options {
@@ -22,7 +23,8 @@ struct Options {
     std::optional<std::uint32_t> generatorVersion;
     std::optional<double> timeOfDay;
     bool freezeTime{},noMods{};
-    std::filesystem::path screenshot, worldDirectory,settingsFile,modsDirectory,identityFile;
+    std::filesystem::path screenshot, worldDirectory,settingsFile,modsDirectory,identityFile,nativeModsDirectory;
+    std::vector<std::filesystem::path> resourcePacks;
 };
 Options parseOptions(int argc,char** argv);
 }

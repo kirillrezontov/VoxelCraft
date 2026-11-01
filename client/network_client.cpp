@@ -38,7 +38,7 @@ GameSession remoteSession(SessionEnvironment& host,Options options) {
     if(host.leaveRequested) co_return SessionExit::Menu;
     auto& window=host.window;auto& renderer=host.renderer;const auto& preferences=host.preferences;auto directory=options.modsDirectory;
     if(directory.empty()&&!options.noMods&&!options.frameLimit) directory=Window::userDataPath()/"mods";
-    ContentServices content(directory);auto& blocks=content.blocks();auto& mods=content.mods();const auto atlas=mods.atlas().layout();
+    ContentServices content(directory,options.nativeModsDirectory);auto& blocks=content.blocks();auto& mods=content.mods();const auto atlas=mods.atlas().layout();
     auto& items=content.items();auto& recipes=content.recipes();auto& mining=content.mining();
     const auto fingerprint=netgame::contentFingerprint(blocks,items,recipes,mining,mods);
     renderer.replaceAtlas(mods.atlas().image());
@@ -61,6 +61,7 @@ GameSession remoteSession(SessionEnvironment& host,Options options) {
     SurvivalState survival;survival.inventory.restore(welcome.profile.items,welcome.profile.selectedSlot,items);survival.restoreHealth(welcome.profile.health);
     SurvivalUiContext survivalUi{&survival,&items,&recipes,[&](InventoryAction action){session.inventory(action);}};
     SandboxUiController ui(inventory,preferences.settings,survivalMode?&survivalUi:nullptr);Camera camera=welcome.profile.camera;
+    ui.setTheme(host.theme);
     camera.fieldOfView=static_cast<float>(preferences.settings.fieldOfView);camera.mouseSensitivity=preferences.settings.mouseSensitivity;camera.invertY=preferences.settings.invertY;
     ui.setCompletionContext({commands::Permission::Player,&items,{welcome.profile.name}});
     LivingWorld living(welcome.metadata.seed);DayCycle day(welcome.worldTime);voxel::Lighting lighting;CoreBackgroundMeshQueue meshes(blocks,atlas);

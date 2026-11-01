@@ -53,7 +53,7 @@ GameSession localSession(SessionEnvironment& host,Options options) {
     auto modsDirectory=options.modsDirectory;
     if(modsDirectory.empty()&&!options.noMods&&!options.smoke&&!options.frameLimit)
         modsDirectory=vc::Window::userDataPath()/"mods";
-    vc::ContentServices content(modsDirectory);
+    vc::ContentServices content(modsDirectory,options.nativeModsDirectory);
     auto& registry=content.blocks();auto& mods=content.mods();
     const auto atlas=mods.atlas().layout();
     renderer.replaceAtlas(mods.atlas().image());
@@ -181,7 +181,7 @@ GameSession localSession(SessionEnvironment& host,Options options) {
     vc::SurvivalState survival;
     auto spawnPoint=savedPlayer?savedPlayer->spawnPoint:std::optional<glm::dvec3>{};
     std::uint64_t poseRevision=0;
-    const auto commandRegistry=vc::commands::builtinCommands();
+    auto commandRegistry=vc::commands::builtinCommands();mods.installCommands(commandRegistry);
     vc::LivingWorld living(metadata.seed);
     if(savedPlayer) { survival.inventory.restore(savedPlayer->items,savedPlayer->selectedSlot,items);survival.restoreHealth(savedPlayer->health); }
     if(savedPlayer) living.restore(savedPlayer->actors,items);
@@ -191,6 +191,7 @@ GameSession localSession(SessionEnvironment& host,Options options) {
     vc::DayCycle day(options.timeOfDay?*options.timeOfDay*vc::DayCycle::length:(savedPlayer?savedPlayer->worldTime:300));
     auto material=inventory.selectedBlock().value_or(vc::voxel::air);
     vc::SandboxUiController ui(inventory,settings,survivalMode?&survivalUi:nullptr);
+    ui.setTheme(host.theme);
     ui.setCompletionContext({vc::commands::Permission::Administrator,&items,{"Player"}});
     const auto notify=[&](std::string message,vc::NotificationSeverity severity=vc::NotificationSeverity::Info) { ui.status(std::move(message),vc::Window::seconds(),severity); };
     const auto dispatchMod=[&](const vc::ModEvent& event) {

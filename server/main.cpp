@@ -31,6 +31,7 @@ Options parse(int argc,char** argv) {
         else if(flag=="--no-save") noSave=true;
         else if(flag=="--mods-dir") { options.host.modsDirectory=vc::utf8Path(value());modsSpecified=true;if(options.host.modsDirectory.empty()) throw std::invalid_argument("--mods-dir must not be empty"); }
         else if(flag=="--no-mods") noMods=true;
+        else if(flag=="--native-mods") { options.host.nativeModsDirectory=vc::utf8Path(value());if(options.host.nativeModsDirectory.empty()) throw std::invalid_argument("--native-mods must not be empty"); }
         else if(flag=="--seed") options.host.seed=number<std::uint64_t>(value());
         else if(flag=="--min-y") options.host.minY=number<std::int64_t>(value());
         else if(flag=="--max-y") options.host.maxY=number<std::int64_t>(value());
@@ -47,6 +48,7 @@ Options parse(int argc,char** argv) {
     }
     if(noSave&&worldSpecified) throw std::invalid_argument("--world-dir conflicts with --no-save");
     if(noMods&&modsSpecified) throw std::invalid_argument("--mods-dir conflicts with --no-mods");
+    if(noMods&&!options.host.nativeModsDirectory.empty()) throw std::invalid_argument("--no-mods conflicts with --native-mods");
     if(noMods) options.host.modsDirectory.clear();
     if(!noSave&&(!options.ticks||worldSpecified)) options.host.worldDirectory=directory;
     if(options.host.radius<1||options.host.radius>6) throw std::invalid_argument("--radius must be 1..6");
@@ -99,6 +101,7 @@ int main(int argc,char** argv) {
                 "--auth-file PATH (per-profile credentials) / --trusted-lan (unauthenticated private network)\n"
                 "--admin NAME (requires --auth-file) --permissions-file PATH --no-console\n"
                 "--radius 1..6 --mods-dir PATH --no-mods --no-creatures --ticks N\n"
+                "--native-mods PATH (explicit trusted DLL/SO loading; process privileges)\n"
                 "--survival / --creative (saved mode resumes automatically)\n"
                 "60 Hz authoritative simulation. Ctrl-C/SIGTERM saves and stops.\n"
                 "Bounded runs are temporary unless --world-dir is explicit. No SDL/Vulkan initialization.\n";

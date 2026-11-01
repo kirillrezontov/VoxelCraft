@@ -48,6 +48,8 @@ Options parseOptions(int argc, char** argv) {
             if(options.modsDirectory.empty()) throw std::invalid_argument("--mods-dir must not be empty");
         }
         else if (flag == "--no-mods") options.noMods=true;
+        else if (flag == "--native-mods") { options.nativeModsDirectory=vc::utf8Path(value());if(options.nativeModsDirectory.empty()) throw std::invalid_argument("--native-mods must not be empty"); }
+        else if (flag == "--resource-pack") { auto path=vc::utf8Path(value());if(path.empty()||options.resourcePacks.size()>=32) throw std::invalid_argument("Resource pack path/count limit");options.resourcePacks.push_back(std::move(path)); }
         else if (flag == "--survival") options.survival=true;
         else if (flag == "--creative") options.survival=false;
         else if (flag == "--generator-version") options.generatorVersion=number<std::uint32_t>(value());
@@ -88,7 +90,9 @@ Options parseOptions(int argc, char** argv) {
         throw std::invalid_argument("--world-dir cannot be combined with --no-save or --smoke");
     if(options.noSettings&&!options.settingsFile.empty()) throw std::invalid_argument("--no-settings conflicts with --settings-file");
     if(options.noMods&&!options.modsDirectory.empty()) throw std::invalid_argument("--no-mods conflicts with --mods-dir");
+    if(options.noMods&&!options.nativeModsDirectory.empty()) throw std::invalid_argument("--no-mods conflicts with --native-mods");
     if(options.smoke&&!options.modsDirectory.empty()) throw std::invalid_argument("--smoke cannot use --mods-dir");
+    if(options.smoke&&!options.nativeModsDirectory.empty()) throw std::invalid_argument("--smoke uses a fixed builtin scene; use --frames for native mod verification");
     if(options.survival.value_or(false)&&(options.fly||options.smoke)) throw std::invalid_argument("--survival cannot be combined with --fly or --smoke");
     if(options.generatorVersion&&(*options.generatorVersion<1||*options.generatorVersion>vc::voxel::terrainGenerationVersion))
         throw std::invalid_argument("Unsupported --generator-version");

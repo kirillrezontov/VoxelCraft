@@ -257,3 +257,11 @@ Unicode/console/command test with resize requests for 1280×720, 1920×1080 and
 CPU layout/font checks validate those exact viewports independently.
 See [the implementation record](v0.8.2-implementation.md) for executed checks;
 Windows CI configuration is maintained but local Windows execution is unverified.
+
+## Native SDK and resource packs
+
+See [the SDK guide](native-modding.md) for the installed `ModSDK` component,
+standalone sample, explicit `--native-mods` trust boundary and resource-pack CLI.
+`VC_CORE_MESHER=example` selects the visible warm reference source module.
+Sanitizer builds must use matching C/C++ compilers because tests include an actual
+C11 plugin; the ASan/TSan presets select both Clang compilers.

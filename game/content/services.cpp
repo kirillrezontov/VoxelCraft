@@ -3,8 +3,8 @@
 #include <utility>
 
 namespace vc {
-ContentServices::ContentServices(const std::filesystem::path& directory)
-    : blocks_(builtinBlocks()), mods_(directory, blocks_) {
+ContentServices::ContentServices(const std::filesystem::path& directory,const std::filesystem::path& nativeRoot)
+    : blocks_(builtinBlocks()), mods_(directory, blocks_,nativeRoot) {
     rebuildGameplay();
 }
 void ContentServices::rebuildGameplay() {
