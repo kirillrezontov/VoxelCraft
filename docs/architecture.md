@@ -1,5 +1,9 @@
 # Architecture: viewer, interaction and persistent sandbox
 
+[ClientApplication and GameSession](client-sessions.md) now separate the persistent
+window/renderer/preferences from frame-owned local and remote sessions. The local
+implementation moved from main to `client/local_session.cpp`; main is the CLI host.
+
 The implemented Milestone 1 target split, persistence owner and static mesher
 contract are described in [modular architecture](modular-architecture.md), with
 the [dependency graph](module-dependency-graph.md) and

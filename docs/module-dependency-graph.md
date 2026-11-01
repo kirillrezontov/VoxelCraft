@@ -13,6 +13,8 @@ flowchart TD
     client --> ui[vc_game_ui / vc_ui_core / vc_settings]
     client --> remote[vc_remote_session]
     client --> storage[vc_storage]
+    client --> sessionContent[vc_session_content]
+    sessionContent --> mods
     server[voxelcraft_server] --> host[vc_server_host]
     server --> os[vc_stop_signal / vc_console_input]
     host --> protocol[vc_protocol]

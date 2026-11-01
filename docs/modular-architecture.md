@@ -91,10 +91,11 @@ service locator, unused resource interface or speculative session API was added.
 | `Host::Impl` | Owns content, world/persistence, generator/streamer, actors/day, connections and saved profiles. Connections die before referenced profile map/content; streamer dies before World. |
 | Renderer | Owns GPU resources and borrows Window. Mesh/HUD upload copies CPU values. Explicit shutdown drains/releases GPU state before inspecting validation and before Window dies. |
 
-No `ClientApplication`, reusable `GameSession`, `ScreenManager` or VoxelUI runtime
-exists yet. In particular each current client loop still constructs its own
-window/renderer and starts with a world/connection. Milestone 2 must separate that
-lifetime; see [the concrete handoff](next-milestone-client-sessions.md).
+At the end of Milestone 1, `ClientApplication`, reusable `GameSession`,
+`ScreenManager` and VoxelUI integration were still future work. The application,
+sessions and navigation are now implemented in [Milestone 2](client-sessions.md).
+VoxelUI integration remains a later milestone. The pre-extraction ownership handoff is retained in
+[next-milestone-client-sessions.md](next-milestone-client-sessions.md).
 
 ## Compatibility and limits
 
