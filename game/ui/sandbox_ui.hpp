@@ -8,6 +8,7 @@
 #include "game/ui/console.hpp"
 #include <functional>
 #include <optional>
+#include <utility>
 
 namespace vc {
 struct UiRect {
@@ -82,6 +83,7 @@ public:
     void setCompletionContext(commands::CompletionContext context);
     bool takeSettingsChanged();
     bool takeSaveRequested();
+    bool takeLeaveRequested() { return std::exchange(leaveRequested_,false); }
     std::vector<std::string> takeCraftedItems();
     std::vector<std::string> takeCommands() { return console_.takeCommands(); }
     std::string takeClipboard();
@@ -102,6 +104,7 @@ private:
     GameSettings settings_;
     SurvivalUiContext* survival_{};
     bool dirty_{true},settingsChanged_{},saveRequested_{},searchFocused_{};
+    bool leaveRequested_{};
     ui::TextEdit search_{256};
     ui::WidgetTree widgets_;
     ui::Theme theme_;

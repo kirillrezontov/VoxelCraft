@@ -1,6 +1,8 @@
 #pragma once
 #include "client/options.hpp"
+#include "client/game_session.hpp"
 
 namespace vc::client {
-int runRemote(const Options& options);
+struct SessionEnvironment;
+GameSession remoteSession(SessionEnvironment& host,Options options);
 }

@@ -19,6 +19,9 @@ public:
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
     void upload(std::span<const Mesh> meshes);
+    // Application/session boundary; same device/window, wait before retiring GPU data.
+    void clearSession();
+    void replaceAtlas(const ImageRgba& image);
     // Replace meshes by origin. Empty index arrays remove previously uploaded meshes.
     void updateMeshes(std::span<const Mesh> meshes);
     void setSelection(std::optional<glm::i64vec3> block);
