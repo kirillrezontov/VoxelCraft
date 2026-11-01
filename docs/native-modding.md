@@ -170,3 +170,75 @@ queues and central gameplay algorithms consume the selected concrete type.
 `CoreSelection.example` verifies real geometry/color output, and the Vulkan smoke
 test executes that client in-world. It intentionally trades greedy geometry for
 visible reference geometry; it is an example, not a performance recommendation.
+
+## Reproduce verification
+
+Use a fresh output directory and the pinned FetchContent sources (the recorded
+run supplied explicit cache-source overrides to avoid redundant downloads):
+
+```sh
+cmake -S VoxelCraft -B build/modding -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DVC_ENABLE_GPU_TESTS=ON -DVC_BUILD_SOAK_TOOLS=ON
+cmake --build build/modding --parallel 5
+ctest --test-dir build/modding -LE graphics --output-on-failure --no-tests=error
+# Run under an available SDL3 Wayland/X11 display and Vulkan device/layer.
+ctest --test-dir build/modding -L graphics --output-on-failure --no-tests=error
+cmake -S VoxelCraft -B build/server-only -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DVC_BUILD_CLIENT=OFF -DBUILD_TESTING=OFF
+cmake --build build/server-only --parallel 3
+cmake -S VoxelCraft -B build/asan -G Ninja -DCMAKE_BUILD_TYPE=Debug \
+    -DVC_BUILD_CLIENT=OFF -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+    -DVC_SANITIZER=address-undefined
+cmake --build build/asan --parallel 3
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+    ctest --test-dir build/asan --output-on-failure --no-tests=error
+# The TSan build uses the same options with -DVC_SANITIZER=thread.
+TSAN_OPTIONS=halt_on_error=1 ctest --test-dir build/tsan --no-tests=error \
+    --output-on-failure \
+    -R '^(TerrainWorker|MeshWorker|BackgroundMeshing|SnapshotWriter|WorldPersistence|CoreModules|NativeMods|NativeSDK)\.'
+cpack --config build/modding/CPackConfig.cmake -C Debug
+python3 VoxelCraft/tests/package_smoke.py build/modding/packages/*.tar.gz --gpu
+```
+
+SDK tests compile/execute both pure C and C++ libraries, negotiate compatible
+minor and reject wrong-major/truncated/missing-export fixtures, reject graph
+cycles/version mismatches before executing code, check failed bootstrap rollback,
+owner-thread rejection, ignored-error rollback, callback retirement, reverse
+stop/destroy/library closure, real server permissions/edits and old-format saves.
+Resource tests cover deterministic providers, bounded reads, bad themes,
+transactional activation, traversal and symlink escapes. The graphics case uses
+actual console/inventory input and reopens the saved world. These are executed
+fixtures, not a fuzz campaign or arbitrary third-party binary compatibility proof.
+
+## Executed milestone gate
+
+The clean source was commit `6d54050`, built into fresh outputs with GCC 16.2.1
+and Clang 22.1.8 on Linux x86-64. Pinned dependency source caches were reused;
+project sources/assets came exclusively from Git. No system packages were installed.
+
+| Check | Result |
+| --- | --- |
+| Clean full Debug client/server + CPU/CLI | Passed, 247/247 |
+| Clean SDL/Vulkan graphics (RADV RENOIR, strict validation) | Passed, 14/14 |
+| Clean Clang ASan/UBSan, leak detection enabled | Passed, 228/228 |
+| Clean Clang TSan selected workers/persistence/native lifecycle | Passed, 28/28 |
+| Fresh independent headless server, tests OFF | Passed, no SDL/Vulkan/VoxelUI dependency |
+| Extracted client/server archives | Both passed; GPU and save/restart included |
+| Installed SDK, installed example, separate build, real game | Passed |
+| Alternate source mesher, real in-world smoke | Passed, 120 frames, zero validation warnings/errors |
+| Tracking and clean committed sibling audit | Zero required-input findings |
+| Windows/MSVC, arbitrary third-party mods, native throughput profile | Not executed |
+
+Inspected actual captures: [Amber menu](screenshots/native-modding/resource-menu.png),
+[data/native inventory](screenshots/native-modding/native-data-inventory.png),
+[alternate mesher](screenshots/native-modding/core-example.png). One initial GUI
+fixture failed because its `/give` omitted the required target selector. Corrected
+input and the subsequent full clean suite passed; the original failure is retained
+in local evidence. This gate does not establish production readiness.
+
+Milestone 4 can now implement the optional Vulkan DrawList backend in independent
+VoxelUI, with a thin adapter using the existing VoxelCraft device/queue/frame fence.
+The catalog's namespaced byte provider, app-owned renderer and no-world session
+lifetime are the concrete seams. Do not replace the legacy interface until new
+screens drive the same game operations and the migration matrix passes.

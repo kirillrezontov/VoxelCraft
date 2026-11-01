@@ -118,3 +118,14 @@ retained for compatibility. Public headers are source contracts, not stable ABI.
 The gameplay target still contains spawn and save-value helpers; protocol still
 couples content fingerprints to modding. These are real dependencies to revisit
 only when another concrete consumer justifies smaller targets.
+
+## Extension ownership added in Milestone 3
+
+Application owns `ResourceCatalog` and the current validated `ui::Theme` before
+renderer/session objects. Pack replacement is transactional and menu-only.
+`ContentServices` owns `ModRuntime`, whose last implementation member owns
+`NativeModRuntime`. Bootstrap publishes copied registries only after full
+validation. Session workers still join before content destruction. Native stop
+requires joined plugin jobs; host command closures retain weak guards and tokens.
+No DLL-owned callable/deleter is retained after the runtime closes libraries.
+See [SDK lifecycle and trust contract](native-modding.md) for exact limits.
