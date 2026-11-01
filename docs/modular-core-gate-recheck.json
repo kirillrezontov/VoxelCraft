@@ -1,0 +1,23 @@
+{
+  "source_commit": "c80315541314d693b1d5f203ae3a3a34447a67f4",
+  "date": "2026-11-01",
+  "evidence_directory": "/tmp/vc-next-cuhcih49",
+  "build": "fresh clone, GCC Debug client/server/graphics; cached pinned dependency sources",
+  "results": {
+    "m1-cpu": {
+      "passed": 222,
+      "total": 222
+    },
+    "m1-graphics": {
+      "passed": 12,
+      "total": 12
+    },
+    "m1-asan": {
+      "passed": 203,
+      "total": 203
+    },
+    "packages": "client and server extracted checks passed, GPU option enabled"
+  },
+  "sanitizers": "Clang ASan+UBSan, detect_leaks=1, halt_on_error=1; all 203 executed",
+  "graphics": "private KWin Wayland virtual output; Vulkan validation and synchronization enabled by existing tests"
+}
