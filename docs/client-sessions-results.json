@@ -1,0 +1,45 @@
+{
+  "implementation_commit": "5ab3f1808a1987765a7e49196c4608c74bfc2965",
+  "test_stabilization_commit": "a74c1a7",
+  "reused_source": "34b2d0f and e6397fb from feature/client-sessions (tip 304432d); source branch left unchanged",
+  "date": "2026-11-01",
+  "evidence_directory": "/tmp/vc-next-cuhcih49",
+  "results": {
+    "m2-clean-cpu": {
+      "passed": 227,
+      "total": 227
+    },
+    "m2-asan": {
+      "passed": 208,
+      "total": 208
+    },
+    "m2-tsan": {
+      "passed": 19,
+      "total": 19
+    },
+    "m2-graphics": {
+      "passed": 13,
+      "total": 13
+    },
+    "m2-clean-graphics-final": {
+      "passed": 13,
+      "total": 13
+    },
+    "packages": "Both extracted archives passed, including client --gpu smoke and server save/restart"
+  },
+  "source_provenance": "Fresh working build, followed by incremental rebuild/test of independent committed checkout (a74c1a7) for CPU and all graphics; Clang sanitizer builds use the same committed production code. No untracked source copied.",
+  "asan_options": "detect_leaks=1:halt_on_error=1",
+  "ubsan_options": "halt_on_error=1:print_stacktrace=1",
+  "tsan_options": "halt_on_error=1",
+  "screenshots_inspected": [
+    "main-menu.ppm",
+    "load-error.ppm",
+    "returned-menu.ppm"
+  ],
+  "limits": [
+    "Windows/MSVC not executed",
+    "transitional legacy menu; full XML/SVG UI migration is later",
+    "no GPU or allocation-performance benchmark added"
+  ],
+  "verification_note": "An earlier clean graphics command raced the test relink and ran the old minimize case (1/13 failed). The final correctly sequenced clean run passed 13/13; raw failure is retained."
+}

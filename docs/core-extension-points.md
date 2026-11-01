@@ -76,3 +76,14 @@ alternative, not a promised optimization. Measurements and unavailable GPU check
 are recorded in [progress](modularization-progress.md). World generation remains
 concrete, versioned and unchanged; additional core extension points are future
 work justified by actual consumers. Native ABI/loader/SDK work is Milestone 3.
+
+## Executable source-mod example
+
+Milestone 3 adds `VC_CORE_MESHER=example`, selecting
+`examples/core_modules/warm_reference_mesher.hpp`. It delegates reference culled
+geometry and applies a warm vertex tint. The default remains greedy. This same
+concrete policy drives foreground/background queues without central gameplay
+changes. `CoreSelection.example` checks geometry and exact tint; a 120-frame
+strict Vulkan in-world smoke also exercised the selected client and its edits.
+This visibly different reference policy is intentionally less geometry-efficient
+than greedy; it is not a speedup claim.

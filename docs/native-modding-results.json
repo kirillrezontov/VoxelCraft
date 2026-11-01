@@ -1,0 +1,68 @@
+{
+  "date": "2026-11-01",
+  "starting_commit": "e8bab9d",
+  "source_status": "Clean detached committed checkout; fresh build outputs for full client/server, independent server, ASan/UBSan and TSan",
+  "results": {
+    "cpu": {
+      "passed": 247,
+      "total": 247
+    },
+    "installed_sdk_game": "Passed: standalone SDK consumer executes actual ClientApplication, native command/data block/resource override/save/shutdown",
+    "core_example_game": "Passed: example mesher 120-frame real Vulkan smoke, 0 validation errors/warnings",
+    "clean_cpu": {
+      "total": 247,
+      "failed": 0,
+      "skipped": 0,
+      "passed": 247
+    },
+    "clean_graphics": {
+      "total": 14,
+      "failed": 0,
+      "skipped": 0,
+      "passed": 14
+    },
+    "asan_ubsan_leaks_enabled": {
+      "total": 228,
+      "failed": 0,
+      "skipped": 0,
+      "passed": 228
+    },
+    "selected_tsan": {
+      "total": 28,
+      "failed": 0,
+      "skipped": 0,
+      "passed": 28
+    },
+    "independent_server": "Passed fresh headless default build, tests OFF; no SDL/Vulkan/VoxelUI discovery or link",
+    "packages": "Both extracted client/server archives passed; client GPU smoke and server Unicode-world save/restart; new resources/data example present",
+    "installed_sdk": "Installed headers/package/example built in an independent consumer and executed by the clean game playtest",
+    "tracking": "Zero required-input findings in both working repos and clean committed sibling audit; new runtime inputs committed"
+  },
+  "sanitizers": {
+    "ASAN_OPTIONS": "detect_leaks=1:halt_on_error=1",
+    "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1",
+    "TSAN_OPTIONS": "halt_on_error=1"
+  },
+  "limits": [
+    "Windows/MSVC not executed",
+    "No arbitrary hot unloading or native sandbox",
+    "SDK 1.0 provides content, commands and coarse events; no native UI/actor/GPU job API",
+    "Data/Lua packs cannot declare native dependencies",
+    "Legacy UI remains active until verified migration",
+    "No native mutable state serialization API; existing opaque save records retained"
+  ],
+  "implementation_commit": "6d540508cb007e1473f5817e6d522cfade74b599",
+  "evidence_directory": "/tmp/vc-next-cuhcih49",
+  "screenshots_inspected": [
+    "screenshots/native-modding/resource-menu.png",
+    "screenshots/native-modding/native-data-inventory.png",
+    "screenshots/native-modding/core-example.png"
+  ],
+  "performance": "No voxel/vertex runtime dispatch added. Source example deliberately uses culled geometry. No native throughput, GPU-duration or allocation benchmark claimed.",
+  "verification_notes": [
+    "First GUI script used /give without the required @s selector and failed; corrected test passed, then full clean graphics passed. Raw initial failure retained.",
+    "Only pinned third-party dependency source caches were reused. Project sources came entirely from committed checkout.",
+    "Full build emitted an existing third-party SDL C const-qualification warning; no new project warnings observed."
+  ],
+  "next_milestone": "4: independent optional VoxelUI Vulkan DrawList backend, host context adapter and conformance verification; legacy UI remains until parity migration."
+}

@@ -13,6 +13,8 @@ flowchart TD
     client --> ui[vc_game_ui / vc_ui_core / vc_settings]
     client --> remote[vc_remote_session]
     client --> storage[vc_storage]
+    client --> sessionContent[vc_session_content]
+    sessionContent --> mods
     server[voxelcraft_server] --> host[vc_server_host]
     server --> os[vc_stop_signal / vc_console_input]
     host --> protocol[vc_protocol]
@@ -82,3 +84,17 @@ cmake --build --preset server --target voxelcraft_server --parallel 4
 The server preset does not discover SDL/Vulkan/VoxelUI. With tests enabled it also
 builds headless CPU UI/mesh tests; that is separate from the server executable's
 link closure. Use `-DBUILD_TESTING=OFF` for the smallest dedicated-server build.
+
+## Milestone 3 additions
+
+`vc_dynamic_library` is the platform-only DLL/SO mechanism (no SDL dependency).
+`vc_native_modding` privately links that mechanism, `vc_commands`, the header SDK
+and JSON; its public values depend on `vc_gameplay`. `vc_modding` privately owns
+the native runtime beside existing Lua and keeps the same public content services.
+`vc_resources` exposes owned bytes/providers with `vc_text` and private JSON.
+The transitional `vc_game_ui` consumes it for validated resource themes.
+`vc_client_runtime` owns the catalog; sessions borrow the validated Theme.
+The headless server has no resource-theme, UI, SDL, Vulkan or meshing link edge.
+`vc_mod_sdk`/`vc_mod_sdk_cpp` are installable header-only contracts and never link
+engine implementation. The existing cycle/forbidden-dependency checks run on the
+new targets at configuration, including the independent server build.

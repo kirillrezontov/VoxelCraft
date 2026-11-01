@@ -74,7 +74,7 @@ struct Host::Impl {
             if(!validPlayerName(name)||name!=playerNameKey(name)||!netgame::validIdentityToken(token))
                 throw std::invalid_argument("Invalid configured profile identity");
         if(config.profileTokens.size()>maxSavedProfiles) throw std::invalid_argument("Too many configured profile identities");
-        mods=std::make_unique<ModRuntime>(config.modsDirectory,blocks);installContent();
+        mods=std::make_unique<ModRuntime>(config.modsDirectory,blocks,config.nativeModsDirectory);installContent();mods->installCommands(commandRegistry);
         fingerprint=netgame::contentFingerprint(blocks,items,recipes,*mining,*mods);
         metadata.seed=config.seed.value_or(12345);metadata.bounds={config.minY.value_or(-512),config.maxY.value_or(511)};
         metadata.generatorVersion=config.generatorVersion.value_or(voxel::terrainGenerationVersion);

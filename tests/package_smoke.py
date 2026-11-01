@@ -54,6 +54,9 @@ def main():
             cwd.mkdir()
             help_text = run(executable, cwd, "--help")
             assert "0.8.2" in help_text, help_text
+            assert "--native-mods" in help_text, help_text
+            assert (executable.parent / "examples/data_mods/signal/content.json").is_file()
+            assert (executable.parent / "docs/native-modding.md").is_file()
             if "server" in executable.name:
                 world = root / "world-тест-世界"
                 output = run(executable, cwd, "--port", "0", "--radius", "1", "--ticks", "90",
@@ -64,6 +67,8 @@ def main():
                              "--world-dir", str(world), "--no-mods", "--no-creatures")
                 assert "loaded world revision 1" in output, output
             else:
+                assert (executable.parent / "assets/resources/voxelcraft/legacy-theme.json").is_file()
+                assert (executable.parent / "examples/resource_packs/amber/resource-pack.json").is_file()
                 assert (executable.parent / "assets/shaders/voxel.vert.spv").is_file()
                 assert (executable.parent / "assets/shaders/voxel.frag.spv").is_file()
                 assert any(p.name == "SDL.txt" for p in files)

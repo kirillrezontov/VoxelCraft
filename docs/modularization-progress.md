@@ -1,5 +1,10 @@
 # Milestone 1 implementation and verification
 
+The previous environment blockers were closed by the 2026-11-01 unrestricted
+rerun: **222/222 CPU/CLI, 12/12 graphics, 203/203 ASan/UBSan with leaks enabled,
+and both extracted packages passed**. See [the gate recheck](modular-core-gate-recheck.json).
+The original record below preserves the earlier run and its limits.
+
 Recorded 2026-11-01. **The implementation is committed; the full milestone gate
 remains open because this runner blocks networking, graphical playtests and
 LeakSanitizer process inspection. Milestone 2 has not started.** This is not a

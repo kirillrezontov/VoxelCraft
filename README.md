@@ -15,6 +15,18 @@ release. See the [implementation/test record](docs/v0.8.2-implementation.md),
 [command reference](docs/v0.8.2-commands.md), [UI guide](docs/v0.8.2-ui-design.md)
 and [release notes](docs/v0.8.2-release-notes.md).
 
+The [modding foundation](docs/native-modding.md) adds an installable C/C++23 SDK,
+explicit trusted DLL/SO loading, declarative content and deterministic resource
+providers. The samples run through real game commands, inventory, saving and
+rendering. Native code has process privileges. The legacy UI is still active;
+The optional [VoxelUI Vulkan adapter](docs/vulkan-ui-integration.md) now records
+DrawLists on the existing device; complete game-screen migration follows its gate.
+
+The [application/session split](docs/client-sessions.md) adds no-world menu
+startup, repeatable local/remote sessions and save/disconnect back to menu while
+retaining the same renderer. Its [verification](docs/client-sessions-results.json)
+is separate from the earlier baseline results.
+
 The [modular core foundation](docs/modular-architecture.md) documents the CPU
 module split, persistence service and compile-time mesher selection. See its
 [verification gate](docs/modularization-progress.md) and

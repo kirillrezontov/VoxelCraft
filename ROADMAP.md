@@ -1,5 +1,18 @@
 # VoxelCraft Development Roadmap
 
+The next-generation program has completed the modular core and application/session
+split. Milestone 3 implements the [native/data/resource/core extension foundation](docs/native-modding.md);
+its executed verification is recorded separately. VoxelUI Vulkan rendering, original
+SVG screens, complete UI integration/removal and release hardening remain the
+ordered next milestones. Existing release tasks below retain their original scope.
+
+
+Milestone 1's environment gates are now closed by the
+[unrestricted recheck](docs/modular-core-gate-recheck.json). Milestone 2 adds
+[ClientApplication and frame-driven local/remote sessions](docs/client-sessions.md)
+with repeated enter/leave, save retry, cancellation and strict Vulkan verification.
+Native modding/resource-pack contracts are the next implementation milestone.
+
 Milestone 1 implementation: separate voxel/generation/lighting/meshing libraries,
 owned persistence, checked module links and static mesher composition. Current
 verification and outstanding environment gates are recorded in

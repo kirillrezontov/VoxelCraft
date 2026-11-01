@@ -15,6 +15,7 @@ public:
     Window(const Window&) = delete;
     Window& operator=(const Window&) = delete;
     Input poll();
+    void resetInput() { input_.reset(); }
     SDL_WindowID id() const;
     void capture(bool enabled);
     void pointerMode(bool enabled);

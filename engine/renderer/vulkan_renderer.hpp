@@ -7,10 +7,14 @@
 #include <optional>
 #include <span>
 
+#if VC_HAS_VOXELUI
+namespace voxelui { inline namespace v1 { struct DrawList; } }
+#endif
 namespace vc {
 class Window;
 class Camera;
 struct RenderMetrics { double drawMilliseconds{},uploadMilliseconds{};std::size_t drawCalls{}; };
+struct UiRenderMetrics { double prepareMicroseconds{},gpuMilliseconds{};std::size_t drawCalls{},uploadBytes{},tessellations{},residentBytes{};bool gpuTimingAvailable{}; };
 struct ValidationReport { bool enabled{}; std::uint32_t errors{}, warnings{}; };
 class VulkanRenderer {
 public:
@@ -19,6 +23,9 @@ public:
     VulkanRenderer(const VulkanRenderer&) = delete;
     VulkanRenderer& operator=(const VulkanRenderer&) = delete;
     void upload(std::span<const Mesh> meshes);
+    // Application/session boundary; same device/window, wait before retiring GPU data.
+    void clearSession();
+    void replaceAtlas(const ImageRgba& image);
     // Replace meshes by origin. Empty index arrays remove previously uploaded meshes.
     void updateMeshes(std::span<const Mesh> meshes);
     void setSelection(std::optional<glm::i64vec3> block);
@@ -31,6 +38,12 @@ public:
     void setInstances(std::span<const RenderInstance> instances);
     std::size_t drawnInstanceCount() const;
     RenderMetrics metrics() const;
+#if VC_HAS_VOXELUI
+    // Owning CPU snapshot. Recording uses this renderer's existing device/frame.
+    void setUi(voxelui::DrawList list);
+    void clearUi();
+    UiRenderMetrics uiMetrics() const;
+#endif
     void requestResize();
     // Returns false when minimized or while recreating the swapchain.
     bool draw(const Camera& camera, const std::filesystem::path& screenshot = {});

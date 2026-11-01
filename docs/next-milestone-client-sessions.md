@@ -1,5 +1,13 @@
 # Milestone 2 handoff: ClientApplication and GameSession
 
+**Implemented:** see [ClientApplication and GameSession](client-sessions.md).
+The pre-extraction handoff below is retained as historical design context.
+
+The previous environment blockers were closed by the 2026-11-01 unrestricted
+rerun: **222/222 CPU/CLI, 12/12 graphics, 203/203 ASan/UBSan with leaks enabled,
+and both extracted packages passed**. See [the gate recheck](modular-core-gate-recheck.json).
+The original record below preserves the earlier run and its limits.
+
 This is the next implementation slice, not an API already present. Begin only
 after the outstanding Milestone 1 networking/graphics verification gate in
 [progress](modularization-progress.md) is closed on a capable runner. Keep legacy

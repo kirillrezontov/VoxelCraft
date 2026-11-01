@@ -1,0 +1,5 @@
+{
+  "blocks": [{"id":"signal:beacon","color":[0.95,0.55,0.15],"emission":12,"name":"Amber signal","category":"building"}],
+  "items": [{"id":"signal:crystal","stack_size":64,"name":"Signal crystal","category":"materials"}],
+  "recipes": [{"name":"AMBER SIGNAL","ingredients":{"voxelcraft:stone":1},"output":"signal:beacon","count":1}]
+}
