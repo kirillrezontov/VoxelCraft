@@ -1,3 +1,6 @@
+#if VC_HAS_VOXELUI
+#include <voxelui/vulkan.hpp>
+#endif
 #include "engine/core/paths.hpp"
 #include "engine/renderer/vulkan_renderer.hpp"
 #include "engine/renderer/overlay.hpp"
@@ -87,6 +90,15 @@ struct VulkanRenderer::ValidationState {
 };
 
 struct VulkanRenderer::Impl {
+#if VC_HAS_VOXELUI
+    std::unique_ptr<voxelui::vulkan::Renderer> uiRenderer;
+    std::optional<voxelui::DrawList> uiList;
+    std::uint64_t uiSerial{};
+    voxelui::vulkan::Target uiTarget() const {
+        const bool srgb=colorFormat==VK_FORMAT_B8G8R8A8_SRGB||colorFormat==VK_FORMAT_R8G8B8A8_SRGB;
+        return {colorFormat,depthFormat,VK_FORMAT_UNDEFINED,VK_SAMPLE_COUNT_1_BIT,srgb};
+    }
+#endif
     Window& window;
     ValidationState& validation;
     bool requireValidation{},vsync{true};
@@ -141,6 +153,9 @@ struct VulkanRenderer::Impl {
             // Best effort during shutdown, including after device loss.
             const auto result = vkDeviceWaitIdle(device);
             if (result != VK_SUCCESS) log("Device wait during shutdown returned " + std::to_string(result));
+#if VC_HAS_VOXELUI
+            uiRenderer.reset();uiList.reset();
+#endif
             meshes.clear();
             models.clear();instanceBuffer={};
             outline = {}; crosshair = {};hudColors={};hudTextures={};hudForeground={};progressBack={};progressFill={};
@@ -461,6 +476,9 @@ struct VulkanRenderer::Impl {
         auto [width, height] = window.pixelSize();
         if (width == 0 || height == 0) return false;
         vkCheck(vkDeviceWaitIdle(device), "Wait before swapchain recreation");
+#if VC_HAS_VOXELUI
+        if(uiRenderer) uiRenderer->releaseCompleted(uiSerial);
+#endif
         destroySwapchain();
         VkSurfaceCapabilitiesKHR caps{};
         vkCheck(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface, &caps), "Query surface capabilities");
@@ -529,6 +547,9 @@ struct VulkanRenderer::Impl {
         vkCheck(vkBindImageMemory(device, depthImage, depthMemory, 0), "Bind depth memory");
         depthView = createView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
         createPipeline();
+#if VC_HAS_VOXELUI
+        if(uiRenderer) uiRenderer->setTarget(uiTarget());
+#endif
         dirty = false;
         log("Swapchain: " + std::to_string(extent.width) + "x" + std::to_string(extent.height));
         return true;
@@ -664,6 +685,9 @@ struct VulkanRenderer::Impl {
         if (window.pixelSize().first == 0 || window.pixelSize().second == 0) return false;
         if (dirty && !recreateSwapchain()) return false;
         vkCheck(vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX), "Wait for frame");
+#if VC_HAS_VOXELUI
+        if(uiRenderer) uiRenderer->releaseCompleted(uiSerial);
+#endif
         prepareInstances(camera);
         Buffer readback;
         if (!screenshot.empty()) {
@@ -678,6 +702,12 @@ struct VulkanRenderer::Impl {
         vkCheck(vkResetCommandBuffer(command, 0), "Reset command buffer");
         auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO); begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkCheck(vkBeginCommandBuffer(command, &begin), "Begin frame commands");
+#if VC_HAS_VOXELUI
+        if(uiRenderer&&uiList) {
+            const auto completed=uiSerial;const auto serial=++uiSerial;
+            uiRenderer->prepare(command,*uiList,{extent,0,serial,completed});
+        }
+#endif
         // Chain the layout transition to the acquire wait at COLOR_ATTACHMENT_OUTPUT;
         // TOP_OF_PIPE would let the transition race presentation's read of this image.
         barrier(images[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -755,6 +785,9 @@ struct VulkanRenderer::Impl {
         if(hudTextures.indexCount) drawMesh(hudTextures,push);
         push.offset.w=1;
         if(hudForeground.indexCount) drawMesh(hudForeground,push);
+#if VC_HAS_VOXELUI
+        if(uiRenderer&&uiList) uiRenderer->render(command);
+#endif
         vkCmdEndRendering(command);
         if (readback.handle) {
             barrier(images[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -807,6 +840,9 @@ void VulkanRenderer::replaceAtlas(const ImageRgba& image) {
     impl_->atlasTexture=std::move(texture);
 }
 void VulkanRenderer::clearSession() {
+#if VC_HAS_VOXELUI
+    clearUi();
+#endif
     upload({});setInstances({});setModels({});setHud({}, {}, false);
     setSelection(std::nullopt);setProgressIndicator(std::nullopt);setAtmosphere(Atmosphere{});
 }
@@ -900,3 +936,21 @@ void VulkanRenderer::updateMeshes(std::span<const Mesh> meshes) {
     for(const auto& mesh:impl_->meshes) impl_->triangles+=(mesh.indexCount+static_cast<std::size_t>(mesh.translucentCount))/3;
 }
 }
+
+#if VC_HAS_VOXELUI
+void vc::VulkanRenderer::setUi(voxelui::DrawList list) {
+    if(!impl_->uiRenderer) {
+        voxelui::vulkan::Limits limits;limits.framesInFlight=1;
+        impl_->uiRenderer=std::make_unique<voxelui::vulkan::Renderer>(voxelui::vulkan::Context{impl_->physical,impl_->device,impl_->graphicsFamily},impl_->uiTarget(),limits);
+    }
+    impl_->uiList=std::move(list);
+}
+void vc::VulkanRenderer::clearUi() {
+    impl_->uiList.reset();if(impl_->uiRenderer) impl_->uiRenderer->clearCaches();
+}
+vc::UiRenderMetrics vc::VulkanRenderer::uiMetrics() const {
+    if(!impl_->uiRenderer) return {};
+    const auto metrics=impl_->uiRenderer->metrics();
+    return {metrics.prepareMicroseconds,metrics.gpuMilliseconds,metrics.drawCalls,metrics.uploadBytes,metrics.tessellations,metrics.textureBytes+metrics.geometryBytes+metrics.stagingBytes,metrics.gpuTimingAvailable};
+}
+#endif

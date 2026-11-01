@@ -19,7 +19,8 @@ The [modding foundation](docs/native-modding.md) adds an installable C/C++23 SDK
 explicit trusted DLL/SO loading, declarative content and deterministic resource
 providers. The samples run through real game commands, inventory, saving and
 rendering. Native code has process privileges. The legacy UI is still active;
-VoxelUI's Vulkan backend and complete UI migration are subsequent work.
+The optional [VoxelUI Vulkan adapter](docs/vulkan-ui-integration.md) now records
+DrawLists on the existing device; complete game-screen migration follows its gate.
 
 The [application/session split](docs/client-sessions.md) adds no-world menu
 startup, repeatable local/remote sessions and save/disconnect back to menu while
