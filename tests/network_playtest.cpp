@@ -1,3 +1,4 @@
+#include "game/modding/runtime.hpp"
 #include "engine/core/log.hpp"
 #include "engine/core/paths.hpp"
 #include "engine/platform/window.hpp"

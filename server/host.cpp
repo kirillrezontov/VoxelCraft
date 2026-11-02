@@ -1,4 +1,5 @@
 #include "server/host.hpp"
+#include "game/modding/runtime.hpp"
 #include "game/commands/permissions.hpp"
 #include "engine/core/log.hpp"
 #include "engine/core/paths.hpp"

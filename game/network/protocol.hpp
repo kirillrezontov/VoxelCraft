@@ -3,7 +3,7 @@
 #include "engine/voxel/storage.hpp"
 #include "game/player/profile.hpp"
 #include "game/simulation/entity_data.hpp"
-#include "game/modding/runtime.hpp"
+#include "game/network/content_fingerprint.hpp"
 #include "game/commands/commands.hpp"
 
 namespace vc::netgame {
@@ -56,9 +56,6 @@ struct State {
 };
 struct ChunkUpdate { voxel::Chunk chunk;std::uint64_t revision{}; };
 Message messageType(std::span<const std::uint8_t> bytes);
-// Compute from registered content before loading saved missing-content fallbacks.
-std::uint64_t contentFingerprint(const voxel::BlockRegistry& blocks,const ItemRegistry& items,
-    const std::vector<Recipe>& recipes,const MiningRules& mining,const ModRuntime& mods);
 binary::Bytes encode(const CommandRequest& message);
 binary::Bytes encode(const CommandReply& message);
 CommandRequest decodeCommand(std::span<const std::uint8_t> bytes);
