@@ -25,6 +25,11 @@ struct SessionEnvironment {
     };
     NextFrame nextFrame() { return {*this}; }
     bool draw(const Camera& camera,const std::filesystem::path& screenshot={}) {
+#if VC_HAS_VOXELUI
+        // A coroutine can enter gameplay during this frame, after application
+        // chrome was prepared. Retire the status snapshot before presenting it.
+        if(screens.current()==ApplicationScreen::Gameplay) renderer.clearUi();
+#endif
         presented=true;return renderer.draw(camera,screenshot);
     }
     void applySettings(const GameSettings& settings) {

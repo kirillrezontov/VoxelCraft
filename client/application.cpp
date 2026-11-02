@@ -1,4 +1,7 @@
 #include "client/application.hpp"
+#if VC_HAS_VOXELUI
+#include "client/declarative_ui.hpp"
+#endif
 #include "client/session_environment.hpp"
 #include "engine/core/log.hpp"
 #include "engine/core/utf8.hpp"
@@ -37,6 +40,9 @@ struct ClientApplication::Impl {
     ApplicationScreen painted{ApplicationScreen::Error};
     std::string paintedMessage;
     float scale{1},left{},top{};
+#if VC_HAS_VOXELUI
+    std::unique_ptr<DeclarativeUi> declarative;
+#endif
     GameSession session; // Destroy first, before every borrowed application owner.
 
     explicit Impl(Options config):options(std::move(config)),window(options.width,options.height,options.fullscreen),
@@ -47,6 +53,9 @@ struct ClientApplication::Impl {
         name.set(options.playerName);resetInput();
         try { activate(options.resourcePacks); }
         catch(const std::exception& error) { log(std::string("Invalid resource pack; using builtin: ")+error.what());activate({}); }
+#if VC_HAS_VOXELUI
+        declarative=std::make_unique<DeclarativeUi>(resources,window.assetPath()/"fonts",address.text(),name.text());
+#endif
         log("ClientApplication ready: main menu without a world");
     }
     void resetInput() { window.capture(false);window.pointerMode(true);window.textInput(false);window.resetInput(); }
@@ -57,6 +66,9 @@ struct ClientApplication::Impl {
         for(const auto& error:diagnostics) log(error);
         for(const auto& error:candidate.takeDiagnostics()) log(error);
         resources=std::move(candidate);theme=next;options.resourcePacks=packs;dirty=true;
+#if VC_HAS_VOXELUI
+        if(declarative) declarative->reload();
+#endif
     }
     void start(Options config,bool remote) {
         if(active) throw std::logic_error("Leave the current session before starting another");
@@ -89,9 +101,21 @@ struct ClientApplication::Impl {
         widgets.focus(retained?focus:screens.current()==ApplicationScreen::Error?"back":"play");dirty=true;
     }
     void chrome() {
-        if(screens.current()==ApplicationScreen::Gameplay) return;
+        if(screens.current()==ApplicationScreen::Gameplay) {
+#if VC_HAS_VOXELUI
+            if(painted!=ApplicationScreen::Gameplay) renderer.clearUi();
+            painted=ApplicationScreen::Gameplay;
+#endif
+            return;
+        }
         const auto size=window.pixelSize();
         if(size.first<=0||size.second<=0) { dirty=true;return; }
+#if VC_HAS_VOXELUI
+        width=size.first;height=size.second;painted=screens.current();
+        declarative->update(screens.current(),screens.message(),width,height,static_cast<float>(preferences.settings.uiScale));
+        renderer.setUi(declarative->draw());
+        return;
+#endif
         if(width!=size.first||height!=size.second||painted!=screens.current()||paintedMessage!=screens.message()) {
             width=size.first;height=size.second;painted=screens.current();paintedMessage=screens.message();layout();
         }
@@ -136,17 +160,29 @@ struct ClientApplication::Impl {
         renderer.setHud(colors,{},false,text);dirty=false;
     }
     void menuInput(const Input& input) {
+        std::string activate;
+#if VC_HAS_VOXELUI
+        declarative->process(input);window.textInput(declarative->editing());
+        switch(declarative->takeAction()) {
+        case MenuAction::Play: activate="play";break;
+        case MenuAction::Connect: activate="connect";break;
+        case MenuAction::Quit: activate="quit";break;
+        case MenuAction::Back: activate="back";break;
+        case MenuAction::None: break;
+        }
+        address.set(declarative->address());name.set(declarative->name());
+#else
         if(widgets.hover(input.cursorX,input.cursorY)) dirty=true;
         if(input.text.tab||input.text.up||input.text.down) {
             widgets.navigate(input.text.up||(input.text.tab&&input.text.shift)?-1:1);dirty=true;
         }
-        std::string activate;
         if(input.primaryClick) if(const auto* hit=widgets.hit(input.cursorX,input.cursorY)) { widgets.focus(hit->id);activate=hit->id;dirty=true; }
         if(input.text.enter) activate=widgets.focused();
         const bool editing=widgets.focused()=="address"||widgets.focused()=="name";
         window.textInput(editing);
         if(editing) dirty=(widgets.focused()=="address"?address:name).process(input.text)||dirty;
         if(input.closeUi&&screens.current()==ApplicationScreen::Error) activate="back";
+#endif
         if(activate=="play") { auto config=options;config.connectHost.clear();config.frameLimit=0;config.smoke=false;start(std::move(config),false); }
         else if(activate=="connect") {
             try {
@@ -179,7 +215,7 @@ struct ClientApplication::Impl {
             if(input.quit) running=false;
             else menuInput(input);
         }
-        if(!active) chrome();
+        chrome();
         if(!host.presented&&running) { if(!renderer.draw(Camera{})) Window::idle(); }
     }
 };

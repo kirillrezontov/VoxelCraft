@@ -6,6 +6,8 @@
 namespace vc::ui {
 struct TextInput {
     std::string text{};
+    std::string composition;
+    bool compositionChanged{};
     bool backspace{},erase{},left{},right{},home{},end{},selectAll{},copy{},cut{},paste{},enter{},escape{},tab{},up{},down{},shift{};
 };
 class TextEdit {

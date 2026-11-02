@@ -1,88 +1,83 @@
-# VoxelUI Vulkan host adapter — Milestone 4
+# VoxelUI host integration — 2026-11-02
 
-The optional backend lives in independent VoxelUI, version 0.2.1.
-Compatible implementation revision: `cb3dd6ff19b7d3ebe01ab01f8b0d6e82c7596948`. VoxelCraft's
-adapter passes its existing physical device, logical device, graphics queue family,
-attachment formats, command buffer and actual fence completion. It creates no
-second Vulkan context. The legacy high-level UI remains active in this milestone.
-XML game screens, original SVG visual design and feature-parity replacement follow
-in the ordered next milestones.
+VoxelUI now drives the optional application main menu, editable connection form,
+loading/saving status and recoverable error screen. XML, CSS and the SVG mark live
+in `assets/resources/voxelcraft/ui`. Actions queue Play/Connect/Back/Quit intents;
+the application executes them after UI dispatch. Gameplay inventory, HUD, console,
+pause and settings retain their existing implementation for this migration stage.
 
-## Dependency contract
+## Build
 
 ```sh
-# Explicit local sibling; source is compiled by its own CMake project.
-cmake -S VoxelCraft -B build/client-ui -G Ninja -DCMAKE_BUILD_TYPE=Debug \
-    -DVC_ENABLE_VOXELUI=ON -DVC_VOXELUI_SOURCE_DIR=../VoxelUI \
-    -DVC_ENABLE_GPU_TESTS=ON
-cmake --build build/client-ui --parallel 4
-
-# Standalone installed dependency; exact package version, no implicit clone.
-cmake -S VoxelUI -B build/ui -DVOXELUI_VULKAN=ON -DVOXELUI_PREVIEW_SDL=OFF
-cmake --build build/ui --parallel 4
-cmake --install build/ui --prefix ui-install
-cmake -S VoxelCraft -B build/installed-ui -DVC_ENABLE_VOXELUI=ON \
-    -DVC_VOXELUI_SOURCE_DIR= -DCMAKE_PREFIX_PATH="$PWD/ui-install"
+cmake -S VoxelCraft -B VoxelCraft/build/ui-integration -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug -DVC_ENABLE_VOXELUI=ON \
+  -DVC_VOXELUI_SOURCE_DIR=../VoxelUI -DVC_ENABLE_GPU_TESTS=ON
+cmake --build VoxelCraft/build/ui-integration --parallel 4
+ctest --test-dir VoxelCraft/build/ui-integration -LE graphics --output-on-failure
+VoxelCraft/build/ui-integration/bin/voxelcraft
 ```
 
-`cmake/VoxelUI.cmake` accepts only an explicit checkout or installed VoxelUI 0.2.1
-with the Vulkan component. It never fetches a moving branch or copies generic
-source into VoxelCraft. The server-only path never includes that file or discovers
-VoxelUI/SDL/Vulkan. Default client builds keep the adapter opt-in until the UI
-migration gate. `vc_renderer` privately links `VoxelUI::vulkan`; gameplay and
-network/persistence public contracts remain graphics independent.
+Use `VC_USE_SYSTEM_DEPS=ON` when the documented system dependencies are installed.
+The default dependency build remains pinned. VoxelUI requires libxml2, FreeType
+and PNG; no dependencies are downloaded by its CMake project. The bridge is opt-in
+so existing client builds and server-only builds do not acquire those dependencies.
+The server-only path never discovers VoxelUI, SDL or Vulkan.
 
-## Concrete renderer interface and lifetime
+An installed VoxelUI **0.2.1** works with `VC_VOXELUI_SOURCE_DIR=` and
+`CMAKE_PREFIX_PATH` pointing at its install prefix. Only the published C++ headers
+and `VoxelUI::voxelui`/`VoxelUI::software` targets are consumed. There is no implicit
+sibling discovery, moving-branch fetch, source copy, new graphics context or game
+dependency in VoxelUI. The earlier integration referenced a Vulkan header/target
+and revision absent from the available VoxelUI repository; that dependency is removed.
 
-With the option enabled, `VulkanRenderer::setUi(voxelui::DrawList)` moves an owning
-snapshot into renderer state; `clearUi` removes it and requests cache retirement.
-`uiMetrics()` returns plain CPU/GPU timing/counter values without exposing Vulkan.
-The constructor's original Window/device/atlas ownership remains unchanged.
+## Rendering and lifetime
 
-The backend is created lazily on the first DrawList. VoxelCraft still has one frame
-in flight and a single frame fence. After waiting that fence, the adapter releases
-the previous UI serial. `prepare` records bounded staging uploads outside dynamic
-rendering. `render` executes after world/legacy overlays inside the host's existing
-rendering pass, with matching depth/color/sample declarations. Screen replacement
-can release CPU layouts immediately because DrawList payloads/cache entries own
-immutable values and submitted frame plans retain GPU buffers/images/descriptors.
+`VulkanRenderer::setUi(DrawList)` retains an owning snapshot. Equality compares
+command values and owning immutable resource identities, so repeated equivalent
+snapshots avoid both rasterization and uploads. The host reference bridge renders
+a **changed** snapshot to a straight-alpha RGBA image and composites one textured
+quad using the existing device, shader, graphics queue and HUD pipeline. It is a
+software-rasterized surface presented through Vulkan, not a native GPU DrawList
+backend, glyph atlas or reusable SVG mesh implementation.
 
-Swapchain recreation already waits device idle; it releases UI serials before
-changing the target format. Minimized frames perform no UI prepare/submit.
-Shutdown waits host GPU completion and destroys the UI backend before the device.
-`clearSession` also clears UI snapshots. Atlas/world/session lifetimes remain those
-of the verified application/session split. Native mods cannot register Vulkan
-objects or unload UI callbacks through SDK 1.0.
+All image/mesh creation, descriptor replacement and retirement occur after the
+existing frame fence. Uploads use the existing synchronous texture upload path;
+changed large surfaces can stall and should not be used for a high-frequency HUD.
+Unchanged frames retain the texture and issue one quad. `clearUi` immediately stops
+using the snapshot and defers GPU destruction until that fence, or device-idle
+shutdown. Minimized frames submit nothing. Resize uses the ordinary swapchain path.
+A session entering gameplay clears status chrome before its first world frame.
 
-The backend uses legacy Vulkan barriers on the graphics queue. It requires Vulkan
-1.3 dynamic rendering, with no new synchronization2 or shader-demote feature.
-It renders rectangles, rounded borders, images, positioned glyph atlases,
-concave/holed/self-crossing even-odd vectors, supported gradients, opacity,
-clips/transforms and UI/DPI scaling. See VoxelUI's `docs/vulkan-backend.md` for
-budgets, frame-completion contract, color-space policy and supported SVG limits.
+`UiRenderMetrics` reports surface preparation time, uploaded RGBA bytes, quad draws
+and logical texture bytes. GPU timestamps are **unavailable**, reported explicitly;
+zero tessellations does not imply GPU SVG geometry. The reference rasterizer combines
+UI layers in byte-valued color space; final host sRGB texture composition blends in
+linear attachment space. Opaque UI matches the reference closely; translucent UI
+against arbitrary world colors has no pixel-exact gamma-space equivalence promise.
 
-## Verification
+## Input, resources and ownership
 
-`Client.VoxelUI` builds a real XML/text/SVG DrawList, captures UI-only rendering,
-composes it with a real chunk mesh on the same device, replaces screens repeatedly,
-resizes, requires minimize/restore acknowledgement, reloads a resource-backed
-screen/font, verifies warmed cache counters and checks validation after shutdown.
-The fixture actionless button demonstrates drawing only; interactive game-screen
-behavior belongs to Milestone 6 and is not claimed here.
+`vc_declarative_ui` translates the existing host input into VoxelUI events,
+including UTF-8 text/preedit, focus loss, clipboard, pointer release and keyboard
+navigation. Window input already supplies physical pixels; DPI is 1 in this adapter
+and UI scale is applied once. Coalesced host input is not a raw SDL event stream;
+full native IME candidate placement remains outside this stage.
 
-The independent VoxelUI conformance suite compares UNORM GPU captures with the
-software renderer at DPI 1/1.5/2. Both English/Russian text use the existing text
-engine. It also exercises two submitted slots, LRU pressure, cache clearing before
-completion, double-prepare/slot rejection, canceled unsubmitted work, GPU/CPU
-budget rollback, target changes and shutdown with synchronization validation.
+ResourceCatalog outlives the runtime provider callback. Pack activation clears
+resolver caches and reloads XML/CSS/SVG; rejected pack resources retry through the
+builtin provider. Valid focus and edited address/name survive reload and screen
+replacement. No LayoutNode pointers are kept by the host. Runtime/model operations
+stay on the application thread. Native SDK 1.0 does not expose UI callbacks; future
+native UI extensions must unregister and quiesce before unloading executable code.
 
-Normal RADV ASan/LSan execution exposed a 128-byte allocation after driver unload.
-A host-only probe that never creates the UI backend reproduces it; loader mappings
-place the allocation at offset 0x35b99e in the loaded `libvulkan_radeon.so` image.
-Keeping RADV loaded through `LD_PRELOAD` allows leak-enabled GPU ASan/UBSan checks
-to complete. Record the normal finding and the driver-retained run separately;
-this is an environment-specific test workaround, not an application dependency or
-a suppression of project allocation leaks. No driver package was modified.
+## Verification and next task
 
-The final committed-source build, installed-package consumer, sanitizer and graphics
-results are recorded in `vulkan-ui-results.json` after the milestone gate.
+Public host tests cover actual menu editing/actions, invalid XML/CSS pack recovery,
+widget unregistration and snapshots surviving runtime destruction. The real graphics
+playtest covers UI-only/world composition, screen replacement, resource reload,
+resize, minimize/restore and shutdown. Application/session and existing graphics
+regressions remain enabled. Exact final results are in `integration-results.json`.
+
+Next: define a native GPU DrawList adapter with conformance images, bounded glyph
+and image caches, and frame-completion retirement before migrating dynamic gameplay
+overlays. Do not interpret this reference bridge as completing that optimization.

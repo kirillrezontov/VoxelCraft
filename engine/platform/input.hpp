@@ -5,7 +5,7 @@
 
 namespace vc {
 struct Input {
-    bool quit{}, resized{}, captured{};
+    bool quit{}, resized{}, captured{}, focusLost{};
     bool quitWithoutSaving{};
     bool destroy{}, place{}, jump{}, toggleFlight{}, save{};
     bool inventory{}, closeUi{}, primaryClick{}, secondaryClick{};

@@ -1,5 +1,5 @@
 #if VC_HAS_VOXELUI
-#include <voxelui/vulkan.hpp>
+#include <voxelui/software.hpp>
 #endif
 #include "engine/core/paths.hpp"
 #include "engine/renderer/vulkan_renderer.hpp"
@@ -91,12 +91,39 @@ struct VulkanRenderer::ValidationState {
 
 struct VulkanRenderer::Impl {
 #if VC_HAS_VOXELUI
-    std::unique_ptr<voxelui::vulkan::Renderer> uiRenderer;
     std::optional<voxelui::DrawList> uiList;
-    std::uint64_t uiSerial{};
-    voxelui::vulkan::Target uiTarget() const {
-        const bool srgb=colorFormat==VK_FORMAT_B8G8R8A8_SRGB||colorFormat==VK_FORMAT_R8G8B8A8_SRGB;
-        return {colorFormat,depthFormat,VK_FORMAT_UNDEFINED,VK_SAMPLE_COUNT_1_BIT,srgb};
+    voxelui::SoftwareRenderer uiRaster;
+    std::unique_ptr<Texture> uiTexture;
+    GpuMesh uiQuad;
+    VkDescriptorSet uiDescriptor{};
+    UiRenderMetrics uiMetrics;
+    bool uiDirty{};
+
+    // Called only after the host frame fence. Upload uses the existing graphics
+    // queue and command buffer; no second context or GPU work in setUi().
+    void prepareUi() {
+        uiMetrics = {};
+        if (!uiList) {
+            uiTexture.reset();uiQuad={};
+            return;
+        }
+        if (uiDirty) {
+            const auto begin = std::chrono::steady_clock::now();
+            uiRaster.render(*uiList, {0,0,0,0});
+            ImageRgba image{static_cast<std::uint32_t>(uiRaster.width()),static_cast<std::uint32_t>(uiRaster.height()),uiRaster.pixels()};
+            auto next = createTexture(image);
+            Mesh quad;
+            const float w=static_cast<float>(image.width),h=static_cast<float>(image.height);
+            quad.vertices={{{0,0,0},{1,1,1},{0,0}},{{w,0,0},{1,1,1},{1,0}},{{w,h,0},{1,1,1},{1,1}},{{0,h,0},{1,1,1},{0,1}}};
+            quad.indices={0,1,2,2,3,0};
+            auto mesh=createMesh(quad);
+            updateTextureDescriptor(0,*next,uiDescriptor);
+            updateTextureDescriptor(1,*next,uiDescriptor);
+            uiTexture=std::move(next);uiQuad=std::move(mesh);uiDirty=false;
+            uiMetrics.uploadBytes=image.pixels.size();
+            uiMetrics.prepareMicroseconds=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-begin).count();
+        }
+        uiMetrics.residentBytes=static_cast<std::size_t>(uiRaster.width())*static_cast<std::size_t>(uiRaster.height())*4;
     }
 #endif
     Window& window;
@@ -154,7 +181,7 @@ struct VulkanRenderer::Impl {
             const auto result = vkDeviceWaitIdle(device);
             if (result != VK_SUCCESS) log("Device wait during shutdown returned " + std::to_string(result));
 #if VC_HAS_VOXELUI
-            uiRenderer.reset();uiList.reset();
+            uiTexture.reset();uiQuad={};uiList.reset();
 #endif
             meshes.clear();
             models.clear();instanceBuffer={};
@@ -437,19 +464,22 @@ struct VulkanRenderer::Impl {
         auto layout=vkStructure<VkDescriptorSetLayoutCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO);
         layout.bindingCount=2;layout.pBindings=bindings.data();
         vkCheck(vkCreateDescriptorSetLayout(device,&layout,nullptr,&descriptorLayout),"Create texture descriptor layout");
-        const VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,2};
+        const VkDescriptorPoolSize size{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,4};
         auto pool=vkStructure<VkDescriptorPoolCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
-        pool.maxSets=1;pool.poolSizeCount=1;pool.pPoolSizes=&size;
+        pool.maxSets=2;pool.poolSizeCount=1;pool.pPoolSizes=&size;
         vkCheck(vkCreateDescriptorPool(device,&pool,nullptr,&descriptorPool),"Create texture descriptor pool");
         auto alloc=vkStructure<VkDescriptorSetAllocateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
         alloc.descriptorPool=descriptorPool;alloc.descriptorSetCount=1;alloc.pSetLayouts=&descriptorLayout;
         vkCheck(vkAllocateDescriptorSets(device,&alloc,&descriptor),"Allocate texture descriptors");
         updateTextureDescriptor(0,*atlasTexture);updateTextureDescriptor(1,*fontTexture);
+#if VC_HAS_VOXELUI
+        vkCheck(vkAllocateDescriptorSets(device,&alloc,&uiDescriptor),"Allocate UI texture descriptors");
+#endif
     }
-    void updateTextureDescriptor(std::uint32_t binding,const Texture& texture) {
+    void updateTextureDescriptor(std::uint32_t binding,const Texture& texture,VkDescriptorSet target={}) {
         const VkDescriptorImageInfo image{texture.sampler,texture.view,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
         auto write=vkStructure<VkWriteDescriptorSet>(VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET);
-        write.dstSet=descriptor;write.dstBinding=binding;write.descriptorCount=1;
+        write.dstSet=target?target:descriptor;write.dstBinding=binding;write.descriptorCount=1;
         write.descriptorType=VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;write.pImageInfo=&image;
         vkUpdateDescriptorSets(device,1,&write,0,nullptr);
     }
@@ -476,9 +506,7 @@ struct VulkanRenderer::Impl {
         auto [width, height] = window.pixelSize();
         if (width == 0 || height == 0) return false;
         vkCheck(vkDeviceWaitIdle(device), "Wait before swapchain recreation");
-#if VC_HAS_VOXELUI
-        if(uiRenderer) uiRenderer->releaseCompleted(uiSerial);
-#endif
+
         destroySwapchain();
         VkSurfaceCapabilitiesKHR caps{};
         vkCheck(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface, &caps), "Query surface capabilities");
@@ -547,9 +575,6 @@ struct VulkanRenderer::Impl {
         vkCheck(vkBindImageMemory(device, depthImage, depthMemory, 0), "Bind depth memory");
         depthView = createView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
         createPipeline();
-#if VC_HAS_VOXELUI
-        if(uiRenderer) uiRenderer->setTarget(uiTarget());
-#endif
         dirty = false;
         log("Swapchain: " + std::to_string(extent.width) + "x" + std::to_string(extent.height));
         return true;
@@ -685,8 +710,9 @@ struct VulkanRenderer::Impl {
         if (window.pixelSize().first == 0 || window.pixelSize().second == 0) return false;
         if (dirty && !recreateSwapchain()) return false;
         vkCheck(vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX), "Wait for frame");
+
 #if VC_HAS_VOXELUI
-        if(uiRenderer) uiRenderer->releaseCompleted(uiSerial);
+        prepareUi();
 #endif
         prepareInstances(camera);
         Buffer readback;
@@ -702,12 +728,7 @@ struct VulkanRenderer::Impl {
         vkCheck(vkResetCommandBuffer(command, 0), "Reset command buffer");
         auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO); begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkCheck(vkBeginCommandBuffer(command, &begin), "Begin frame commands");
-#if VC_HAS_VOXELUI
-        if(uiRenderer&&uiList) {
-            const auto completed=uiSerial;const auto serial=++uiSerial;
-            uiRenderer->prepare(command,*uiList,{extent,0,serial,completed});
-        }
-#endif
+
         // Chain the layout transition to the acquire wait at COLOR_ATTACHMENT_OUTPUT;
         // TOP_OF_PIPE would let the transition race presentation's read of this image.
         barrier(images[imageIndex], VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -786,7 +807,10 @@ struct VulkanRenderer::Impl {
         push.offset.w=1;
         if(hudForeground.indexCount) drawMesh(hudForeground,push);
 #if VC_HAS_VOXELUI
-        if(uiRenderer&&uiList) uiRenderer->render(command);
+        if(uiList&&uiQuad.indexCount) {
+            vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipelineLayout,0,1,&uiDescriptor,0,nullptr);
+            push.offset.w=2;drawMesh(uiQuad,push);uiMetrics.drawCalls=1;
+        }
 #endif
         vkCmdEndRendering(command);
         if (readback.handle) {
@@ -939,18 +963,12 @@ void VulkanRenderer::updateMeshes(std::span<const Mesh> meshes) {
 
 #if VC_HAS_VOXELUI
 void vc::VulkanRenderer::setUi(voxelui::DrawList list) {
-    if(!impl_->uiRenderer) {
-        voxelui::vulkan::Limits limits;limits.framesInFlight=1;
-        impl_->uiRenderer=std::make_unique<voxelui::vulkan::Renderer>(voxelui::vulkan::Context{impl_->physical,impl_->device,impl_->graphicsFamily},impl_->uiTarget(),limits);
-    }
-    impl_->uiList=std::move(list);
+    if(impl_->uiList && *impl_->uiList==list) return;
+    impl_->uiList=std::move(list);impl_->uiDirty=true;
 }
 void vc::VulkanRenderer::clearUi() {
-    impl_->uiList.reset();if(impl_->uiRenderer) impl_->uiRenderer->clearCaches();
+    // GPU data retires after the next host fence, or device idle on destruction.
+    impl_->uiList.reset();impl_->uiDirty=false;
 }
-vc::UiRenderMetrics vc::VulkanRenderer::uiMetrics() const {
-    if(!impl_->uiRenderer) return {};
-    const auto metrics=impl_->uiRenderer->metrics();
-    return {metrics.prepareMicroseconds,metrics.gpuMilliseconds,metrics.drawCalls,metrics.uploadBytes,metrics.tessellations,metrics.textureBytes+metrics.geometryBytes+metrics.stagingBytes,metrics.gpuTimingAvailable};
-}
+vc::UiRenderMetrics vc::VulkanRenderer::uiMetrics() const { return impl_->uiMetrics; }
 #endif

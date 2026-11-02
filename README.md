@@ -18,9 +18,13 @@ and [release notes](docs/v0.8.2-release-notes.md).
 The [modding foundation](docs/native-modding.md) adds an installable C/C++23 SDK,
 explicit trusted DLL/SO loading, declarative content and deterministic resource
 providers. The samples run through real game commands, inventory, saving and
-rendering. Native code has process privileges. The legacy UI is still active;
-The optional [VoxelUI Vulkan adapter](docs/vulkan-ui-integration.md) now records
-DrawLists on the existing device; complete game-screen migration follows its gate.
+rendering. Native code has process privileges. The optional
+[VoxelUI integration](docs/vulkan-ui-integration.md) now runs XML/CSS/SVG menus,
+connection editing, status and error screens. Its reference bridge presents changed
+software surfaces through the existing Vulkan device. Gameplay overlays remain on
+the existing UI; a native GPU DrawList backend is a separate next task. Enable it
+with `VC_ENABLE_VOXELUI=ON` and an explicit `VC_VOXELUI_SOURCE_DIR` or installed
+VoxelUI 0.2.1 package.
 
 The [application/session split](docs/client-sessions.md) adds no-world menu
 startup, repeatable local/remote sessions and save/disconnect back to menu while

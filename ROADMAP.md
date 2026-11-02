@@ -2,9 +2,10 @@
 
 The next-generation program has completed the modular core and application/session
 split. Milestone 3 implements the [native/data/resource/core extension foundation](docs/native-modding.md);
-its executed verification is recorded separately. VoxelUI Vulkan rendering, original
-SVG screens, complete UI integration/removal and release hardening remain the
-ordered next milestones. Existing release tasks below retain their original scope.
+its executed verification is recorded separately. Optional VoxelUI application
+menus, status/error screens and the reference Vulkan surface bridge are implemented.
+A native GPU DrawList adapter, gameplay-overlay migration and release hardening
+remain next. Existing release tasks below retain their original scope.
 
 
 Milestone 1's environment gates are now closed by the

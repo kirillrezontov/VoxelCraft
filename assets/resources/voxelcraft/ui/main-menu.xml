@@ -1,0 +1,13 @@
+<Screen version="1" id="menu" stylesheet="voxelcraft:ui/menu.css">
+  <Column id="card" class="card" anchor="center">
+    <Row style="gap:16dp;align-items:center"><Vector source="voxelcraft:ui/mark.svg" style="width:48dp;height:48dp"/><Text class="title">VoxelCraft</Text></Row>
+    <Text class="subtitle">Choose a session / Выберите игру</Text>
+    <Button id="play" action="voxelcraft:play" value="Play sandbox"/>
+    <Text class="field-label">Server address</Text>
+    <TextInput id="address" value="{menu.address}" writable="true"/>
+    <Text class="field-label">Player name</Text>
+    <TextInput id="name" value="{menu.name}" writable="true"/>
+    <Button id="connect" action="voxelcraft:connect" value="Connect"/>
+    <Button id="quit" action="voxelcraft:quit" value="Quit"/>
+  </Column>
+</Screen>

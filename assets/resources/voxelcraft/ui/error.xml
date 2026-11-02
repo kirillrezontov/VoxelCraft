@@ -1,0 +1,8 @@
+<Screen version="1" id="error" stylesheet="voxelcraft:ui/menu.css">
+  <Column class="card" anchor="center">
+    <Text class="title">VoxelCraft</Text>
+    <Text value="{menu.title}" class="subtitle"/>
+    <ScrollView style="height:300dp;width:100%;overflow:hidden"><Text id="message" value="{menu.message}" style="color:#f2ad97;width:100%"/></ScrollView>
+    <Button id="back" action="voxelcraft:back" value="Back to main menu"/>
+  </Column>
+</Screen>

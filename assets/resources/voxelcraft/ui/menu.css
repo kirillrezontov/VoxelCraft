@@ -1,0 +1,11 @@
+Screen { background:#171e21; color:#eee7d8; font-family:ui:DejaVuSans.ttf; font-size:18dp; }
+.card { width:600dp; height:620dp; padding:32dp; gap:12dp; background:#293235; border-color:#526356; border-width:2dp; border-radius:12dp; }
+.title { font-size:36dp; color:#f2c477; }
+.subtitle { font-size:18dp; color:#b2c3b2; }
+.field-label { font-size:16dp; color:#c1c9c3; }
+Button { width:100%; height:46dp; padding:10dp; background:#3d5147; border-color:#647c66; border-width:1dp; border-radius:5dp; }
+Button:hover { background:#536b55; }
+Button:focus { border-color:#f2c477; border-width:2dp; }
+Button:active { background:#665a3f; }
+TextInput { width:100%; height:44dp; padding:10dp; background:#1b2428; border-color:#526356; border-width:1dp; }
+TextInput:focus { border-color:#f2c477; border-width:2dp; }

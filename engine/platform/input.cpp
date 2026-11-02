@@ -32,11 +32,20 @@ void InputState::process(const SDL_Event& event) {
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
     case SDL_EVENT_WINDOW_RESTORED: pending_.resized = true; break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
-    case SDL_EVENT_WINDOW_MINIMIZED: setCaptured(false);resetActions(); break;
+    case SDL_EVENT_WINDOW_MINIMIZED: setCaptured(false);resetActions();pending_.focusLost=true; break;
+    case SDL_EVENT_TEXT_EDITING:
+        if(textInput_&&event.edit.text) {
+            const std::string_view value=event.edit.text;
+            if(value.size()<=4096&&utf8::valid(value)) { pending_.text.composition=value;pending_.text.compositionChanged=true; }
+        }
+        break;
     case SDL_EVENT_TEXT_INPUT:
         if(textInput_&&event.text.text) {
             const std::string_view text=event.text.text;
-            if(text.size()<=4096&&utf8::valid(text)&&pending_.text.text.size()+text.size()<=4096) pending_.text.text+=text;
+            if(text.size()<=4096&&utf8::valid(text)&&pending_.text.text.size()+text.size()<=4096) {
+                pending_.text.text+=text;
+                pending_.text.composition.clear();pending_.text.compositionChanged=true;
+            }
         }
         break;
     case SDL_EVENT_KEY_UP:

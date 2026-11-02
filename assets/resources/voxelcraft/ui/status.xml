@@ -1,0 +1,9 @@
+<Screen version="1" id="status" stylesheet="voxelcraft:ui/menu.css">
+  <Column class="card" anchor="center">
+    <Vector source="voxelcraft:ui/mark.svg" style="width:80dp;height:80dp"/>
+    <Text class="title">VoxelCraft</Text>
+    <Text value="{menu.title}" class="subtitle"/>
+    <Text id="message" value="{menu.message}" style="width:100%"/>
+    <Text class="subtitle">Escape to cancel while loading</Text>
+  </Column>
+</Screen>

@@ -140,3 +140,13 @@ TEST(Input, ConsoleUsesUnicodeTextEventsAndIsolatesAllGameplayKeys) {
     state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_ESCAPE));EXPECT_TRUE(state.consume().closeUi);
     state.setTextInput(false);state.setCaptured(true);EXPECT_EQ(state.consume().forward,0);
 }
+TEST(Input, DeclarativeCompositionCommitAndFocusLossDoNotLeaveStalePreedit) {
+    vc::InputState state;state.setPointerMode(true);state.setTextInput(true);
+    SDL_Event event{};event.type=SDL_EVENT_TEXT_EDITING;event.edit.text="При";state.process(event);
+    auto in=state.consume();EXPECT_TRUE(in.text.compositionChanged);EXPECT_EQ(in.text.composition,"При");
+    event.edit.text="Привет";state.process(event);event={};event.type=SDL_EVENT_TEXT_INPUT;event.text.text="Привет";state.process(event);
+    in=state.consume();EXPECT_EQ(in.text.text,"Привет");EXPECT_TRUE(in.text.compositionChanged);EXPECT_TRUE(in.text.composition.empty());
+    event={};event.type=SDL_EVENT_WINDOW_FOCUS_LOST;state.process(event);
+    in=state.consume();EXPECT_TRUE(in.focusLost);EXPECT_TRUE(in.text.composition.empty());EXPECT_FALSE(in.primaryHeld);
+    EXPECT_FALSE(state.consume().focusLost);
+}
