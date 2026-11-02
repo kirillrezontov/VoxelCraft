@@ -55,6 +55,7 @@ struct ClientApplication::Impl {
         catch(const std::exception& error) { log(std::string("Invalid resource pack; using builtin: ")+error.what());activate({}); }
 #if VC_HAS_VOXELUI
         declarative=std::make_unique<DeclarativeUi>(resources,window.assetPath()/"fonts",address.text(),name.text());
+        host.declarative=declarative.get();
 #endif
         log("ClientApplication ready: main menu without a world");
     }
@@ -103,7 +104,7 @@ struct ClientApplication::Impl {
     void chrome() {
         if(screens.current()==ApplicationScreen::Gameplay) {
 #if VC_HAS_VOXELUI
-            if(painted!=ApplicationScreen::Gameplay) renderer.clearUi();
+            if(painted!=ApplicationScreen::Gameplay&&!host.gameplayUiPrepared) renderer.clearUi();
             painted=ApplicationScreen::Gameplay;
 #endif
             return;
@@ -169,6 +170,7 @@ struct ClientApplication::Impl {
         case MenuAction::Quit: activate="quit";break;
         case MenuAction::Back: activate="back";break;
         case MenuAction::None: break;
+        case MenuAction::Resume:case MenuAction::Settings:case MenuAction::Save:case MenuAction::Leave:break;
         }
         address.set(declarative->address());name.set(declarative->name());
 #else
@@ -198,6 +200,9 @@ struct ClientApplication::Impl {
         if(shutdown) throw std::logic_error("Application is shut down");
         if(!running) return;
         if(input.resized) renderer.requestResize();
+#if VC_HAS_VOXELUI
+        host.gameplayUiPrepared=false;
+#endif
         chrome();host.presented=false;
         if(active) {
             if(input.quit) host.quitRequested=true;

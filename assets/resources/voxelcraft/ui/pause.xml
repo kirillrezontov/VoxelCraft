@@ -1,0 +1,14 @@
+<Screen version="1" id="pause" stylesheet="voxelcraft:ui/gameplay.css">
+  <Column id="pause-card" class="pause-card" anchor="center">
+    <Row style="gap:16dp;align-items:center">
+      <Vector source="voxelcraft:ui/mark.svg" style="width:44dp;height:44dp"/>
+      <Text class="title" style="font-size:32dp">Paused / Пауза</Text>
+    </Row>
+    <Text id="pause-hint" class="hint" value="{game.pauseHint}"/>
+    <Button id="resume" action="voxelcraft:resume" value="Resume"/>
+    <Button id="settings" action="voxelcraft:settings" value="Settings"/>
+    <Button id="save" action="voxelcraft:save" value="Save world"/>
+    <Button id="leave" action="voxelcraft:leave" value="Return to main menu"/>
+    <Text class="hint">Esc · Resume</Text>
+  </Column>
+</Screen>

@@ -4,7 +4,7 @@
 
 namespace vc::client {
 enum class ApplicationScreen { MainMenu, Loading, Gameplay, Saving, Error };
-// Application routes only. Existing inventory/pause/console overlays stay in UI.
+// Application routes only. Gameplay overlay state stays in SandboxUiController.
 class ScreenManager {
 public:
     ApplicationScreen current() const { return current_; }

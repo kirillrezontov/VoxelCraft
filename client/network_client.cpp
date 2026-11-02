@@ -117,9 +117,9 @@ GameSession remoteSession(SessionEnvironment& host,Options options) {
         const auto [width,height]=window.pixelSize();
         const bool closingConsole=ui.screen()==vc::UiScreen::Console&&!input.console;
         if(input.console) consoleCaptureBefore=input.consoleCapturedBefore;
-        if(ui.process({input.inventory,input.closeUi,input.primaryClick,input.secondaryClick,input.material,input.scroll,input.cursorX,input.cursorY,input.settings,input.crafting,input.console,input.pause,input.primaryRelease,input.primaryHeld,input.shift,input.text},width,height)) {
+        if(host.processUi(ui,input,width,height)) {
             window.pointerMode(ui.open());window.capture(!ui.open()&&(!closingConsole||consoleCaptureBefore));actions=0;
-            input.forward=input.right=input.up=input.mouseX=input.mouseY=0;input.destroy=input.place=input.jump=input.toggleFlight=false;input.captured=!ui.open()&&(!closingConsole||consoleCaptureBefore);
+            input.forward=input.right=input.up=input.mouseX=input.mouseY=0;input.destroy=input.place=input.destroyHeld=input.jump=input.toggleFlight=false;input.captured=!ui.open()&&(!closingConsole||consoleCaptureBefore);
         }
         window.textInput(ui.wantsTextInput());window.pointerMode(ui.open());
         if(auto clipboard=ui.takeClipboard();!clipboard.empty()) window.clipboard(clipboard);
@@ -191,6 +191,7 @@ GameSession remoteSession(SessionEnvironment& host,Options options) {
         }
         std::erase_if(avatars,[&](const auto& entry){return !present.contains(entry.first);});renderer.setInstances(instances);
         if(auto hud=ui.rebuild(blocks,atlas,width,height,now)) renderer.setHud(hud->colored,hud->textured,!ui.open(),hud->foreground);
+        host.updateUi(ui,survivalMode,survival.health(),true,width,height);
         const auto updateMilliseconds=(Window::seconds()-updateStart)*1000;
         const bool capture=!capturedScreenshot&&!options.screenshot.empty()&&everReady&&frames>=(options.frameLimit?options.frameLimit-1:60);
         if(host.draw(camera,capture?options.screenshot:std::filesystem::path{})) {

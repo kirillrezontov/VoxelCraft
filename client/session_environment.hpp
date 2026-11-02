@@ -3,12 +3,14 @@
 #include "client/screen_manager.hpp"
 #include "client/preferences.hpp"
 #include "engine/ui/widgets.hpp"
+#include "game/ui/sandbox_ui.hpp"
 #include "engine/platform/window.hpp"
 #include "engine/renderer/vulkan_renderer.hpp"
 #include <coroutine>
 #include <utility>
 
 namespace vc::client {
+class DeclarativeUi;
 struct SessionEnvironment {
     Window& window;
     VulkanRenderer& renderer;
@@ -17,6 +19,12 @@ struct SessionEnvironment {
     const ui::Theme& theme;
     Input input;
     bool leaveRequested{}, quitRequested{}, presented{};
+#if VC_HAS_VOXELUI
+    DeclarativeUi* declarative{}; // Application-owned; outlives all sessions.
+    bool gameplayUiPrepared{};
+#endif
+    bool processUi(SandboxUiController&,const Input&,int width,int height);
+    void updateUi(const SandboxUiController&,bool survival,unsigned health,bool remote,int width,int height);
     struct NextFrame {
         SessionEnvironment& host;
         bool await_ready() const noexcept { return false; }
@@ -28,7 +36,7 @@ struct SessionEnvironment {
 #if VC_HAS_VOXELUI
         // A coroutine can enter gameplay during this frame, after application
         // chrome was prepared. Retire the status snapshot before presenting it.
-        if(screens.current()==ApplicationScreen::Gameplay) renderer.clearUi();
+        if(screens.current()==ApplicationScreen::Gameplay&&!gameplayUiPrepared) renderer.clearUi();
 #endif
         presented=true;return renderer.draw(camera,screenshot);
     }

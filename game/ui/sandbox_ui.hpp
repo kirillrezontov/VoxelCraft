@@ -39,8 +39,10 @@ struct SurvivalUiContext {
     std::function<void(InventoryAction)> request{};
 };
 enum class UiScreen { Gameplay,Inventory,Crafting,Settings,Pause,Console };
+enum class PauseAction { Resume, Settings, Save, Leave };
 struct SandboxUiView {
     UiScreen screen{UiScreen::Gameplay};
+    bool externalChrome{};
     const std::vector<ItemId>* catalog{};
     const std::vector<std::size_t>* recipes{};
     std::string query,tooltip,hovered,focused;
@@ -79,6 +81,10 @@ public:
     bool wantsTextInput() const { return screen_==UiScreen::Console||searchFocused_; }
     UiScreen screen() const { return screen_; }
     void closeMenus();
+    // Host UI may replace pause controls and gameplay health without owning the
+    // simulation/menu state. Commands are accepted only while Pause is active.
+    void pauseAction(PauseAction);
+    void externalChrome(bool enabled) { if(externalChrome_!=enabled) { externalChrome_=enabled;dirty_=true; } }
     void setSurvivalContext(SurvivalUiContext* context);
     void setCompletionContext(commands::CompletionContext context);
     bool takeSettingsChanged();
@@ -105,6 +111,7 @@ private:
     SurvivalUiContext* survival_{};
     bool dirty_{true},settingsChanged_{},saveRequested_{},searchFocused_{};
     bool leaveRequested_{};
+    bool externalChrome_{};
     ui::TextEdit search_{256};
     ui::WidgetTree widgets_;
     ui::Theme theme_;

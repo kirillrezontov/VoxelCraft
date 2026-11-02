@@ -46,6 +46,16 @@ SandboxUiController::SandboxUiController(CreativeInventory& inventory,GameSettin
     settings_.validate();completion_.items=&inventory.items();completion_.permission=commands::Permission::Administrator;refreshCatalog();
 }
 void SandboxUiController::closeMenus() { screen_=UiScreen::Gameplay;searchFocused_=false;dragSource_.reset();dirty_=true; }
+void SandboxUiController::pauseAction(PauseAction action) {
+    if(screen_!=UiScreen::Pause) return;
+    switch(action) {
+    case PauseAction::Resume:closeMenus();break;
+    case PauseAction::Settings:settingsReturn_=UiScreen::Pause;screen_=UiScreen::Settings;break;
+    case PauseAction::Save:saveRequested_=true;status("Save requested",now_);break;
+    case PauseAction::Leave:leaveRequested_=true;break;
+    }
+    dirty_=true;
+}
 void SandboxUiController::setSurvivalContext(SurvivalUiContext* context) {
     if(survival_==context) return;
     survival_=context;dragSource_.reset();itemRevision_=0;dirty_=true;refreshCatalog();
@@ -68,7 +78,7 @@ void SandboxUiController::layoutWidgets(int width,int height) {
     };
     if(screen_==UiScreen::Settings) {
         for(std::size_t i=0;i<9;++i) add("setting"+std::to_string(i),ui::WidgetKind::Button,l.settingsButton(i));
-    } else if(screen_==UiScreen::Pause) {
+    } else if(screen_==UiScreen::Pause&&!externalChrome_) {
         for(std::size_t i=0;i<4;++i) add("pause"+std::to_string(i),ui::WidgetKind::Button,l.pauseButton(i));
     } else if(screen_==UiScreen::Inventory||screen_==UiScreen::Crafting) {
         const auto tip=[&](const ItemDefinition& item,const ItemStack* stack=nullptr) {
@@ -131,10 +141,7 @@ void SandboxUiController::activate(std::string_view id,const SandboxUiInput& inp
         else settings_.uiScale=std::clamp(std::round((settings_.uiScale+(i==7?-0.1:0.1))*100)/100,0.75,1.75);
         settingsChanged_=settingsChanged_||before!=settings_;dirty_=true;
     } else if(id.starts_with("pause")) {
-        const auto i=index("pause");if(i==0) closeMenus();
-        else if(i==1) { settingsReturn_=UiScreen::Pause;screen_=UiScreen::Settings;dirty_=true; }
-        else if(i==2) { saveRequested_=true;status("Save requested",now_); }
-        else leaveRequested_=true;
+        const auto i=index("pause");if(i<4) pauseAction(static_cast<PauseAction>(i));
     } else if(id.starts_with("slot")) {
         const auto i=index("slot");if(i>=36) return;
         if(!survival_) {
@@ -176,6 +183,12 @@ bool SandboxUiController::process(const SandboxUiInput& input,int width,int heig
     else if(input.toggle) { screen_=screen_==UiScreen::Inventory?UiScreen::Gameplay:UiScreen::Inventory;searchFocused_=false;search_.set("");refreshCatalog();page_=0;dirty_=true; }
     if(screen_==UiScreen::Console) {
         if(!input.console) dirty_=console_.process(input.text,input.scroll,commandRegistry_,completion_,now_)||dirty_;
+        return wasOpen!=open()||oldScreen!=screen_;
+    }
+    if(screen_==UiScreen::Pause&&externalChrome_) {
+        // Also covers entering Pause with coalesced keyboard/click input: a
+        // retained legacy focus must not activate an invisible settings control.
+        widgets_.clear();
         return wasOpen!=open()||oldScreen!=screen_;
     }
     if(registrySize_!=inventory_.items().size()) { refreshCatalog();dirty_=true; }
@@ -253,7 +266,7 @@ std::optional<HudGeometry> SandboxUiController::rebuild(const voxel::BlockRegist
     if(creativeRevision_!=inventory_.revision()) { creativeRevision_=inventory_.revision();dirty_=true; }
     if(width<=0||height<=0||(!dirty_&&width==width_&&height==height_)) return std::nullopt;
     layoutWidgets(width,height);
-    SandboxUiView view;view.screen=screen_;view.catalog=&catalog_;view.recipes=&recipes_;view.query=search_.text();view.category=category_;
+    SandboxUiView view;view.screen=screen_;view.externalChrome=externalChrome_;view.catalog=&catalog_;view.recipes=&recipes_;view.query=search_.text();view.category=category_;
     view.searchEditor=&search_;view.searchFocused=searchFocused_;
     view.hovered=widgets_.hovered();view.focused=widgets_.focused();view.console=&console_;view.notifications=&notifications_;
     view.dragSource=dragSource_;view.mouseX=mouseX_;view.mouseY=mouseY_;view.now=now;

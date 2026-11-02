@@ -1,0 +1,11 @@
+<Screen version="1" id="hud" stylesheet="voxelcraft:ui/gameplay.css">
+  <Column id="hud-card" class="hud-card" anchor="top-left">
+    <Text id="mode" class="title" value="{game.mode}"/>
+    <Row id="health" visible="{game.survival}" style="gap:12dp;align-items:center">
+      <Text value="Health"/>
+      <ProgressBar id="health-bar" value="{game.health}" min="0" max="20" style="width:112dp;height:12dp;background:#34463c;color:#9abe81"/>
+      <Text id="health-text" value="{game.healthText}"/>
+    </Row>
+    <Text class="hint">Esc · Pause   E · Inventory   / · Console</Text>
+  </Column>
+</Screen>

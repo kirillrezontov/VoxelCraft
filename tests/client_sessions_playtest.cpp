@@ -61,6 +61,10 @@ int main(int argc,char** argv) {
             until([&] { return app.screen()==vc::client::ApplicationScreen::Gameplay; },tick);
             require(&app.renderer()==renderer,"Renderer owner changed between sessions");
             for(int i=0;i<8;++i) tick();
+#if VC_HAS_VOXELUI
+            require(renderer->uiMetrics().drawCalls==1&&renderer->uiMetrics().uploadBytes==0,"Idle gameplay recreated the declarative HUD surface");
+            if(cycle==0) until([&] { return renderer->draw(vc::Camera{},captures/"voxelui-hud.ppm"); },tick);
+#endif
             if(cycle==1) {
                 const auto snapshots=config.worldDirectory/"snapshots";
                 const auto backup=config.worldDirectory/"snapshots-backup";
@@ -70,19 +74,33 @@ int main(int argc,char** argv) {
                 require(app.hasSession()&&app.renderer().meshCount()>0,"Save failure discarded the live world");
                 std::filesystem::remove(snapshots);std::filesystem::rename(backup,snapshots);
             }
-            // Exercise the actual fourth legacy pause control on the first cycle.
+            // Exercise the actual pause/settings/leave controls on the first cycle.
             if(cycle==0) {
                 vc::Input pause;pause.pause=true;app.frame(pause);
                 const vc::SandboxUiLayout layout(config.width,config.height);
                 auto click=[&](vc::UiRect rect) { vc::Input input;input.primaryClick=true;input.cursorX=rect.x+rect.width/2;input.cursorY=rect.y+rect.height/2;app.frame(input); };
-                click(layout.pauseButton(1));click(layout.settingsButton(1));
+#if VC_HAS_VOXELUI
+                // Resume is initially focused. Navigate the authored XML controls.
+                vc::Input tab;tab.text.tab=true;app.frame(tab);
+                vc::Input enter;enter.text.enter=true;app.frame(enter);
+                until([&] { return app.renderer().draw(vc::Camera{},captures/"pause-settings.ppm"); },tick);
+#else
+                click(layout.pauseButton(1));
+#endif
+                click(layout.settingsButton(1));
                 require(app.settings().fieldOfView==80,"Application did not receive session settings");
                 const auto settings=vc::loadSettings(config.settingsFile);
                 require(settings&&settings->settings==app.settings(),"Application settings did not persist");
                 vc::Input back;back.closeUi=true;app.frame(back);
+#if VC_HAS_VOXELUI
+                until([&] { return app.renderer().draw(vc::Camera{},captures/"voxelui-pause.ppm"); },tick);
+                for(int step=0;step<3;++step) app.frame(tab);
+                app.frame(enter);
+#else
                 const auto button=layout.pauseButton(3);vc::Input leave;
                 leave.primaryClick=true;leave.cursorX=button.x+button.width/2;leave.cursorY=button.y+button.height/2;
                 app.frame(leave);
+#endif
             } else app.requestLeave();
             until([&] { return !app.hasSession(); },tick);
             require(app.running()&&app.screen()==vc::client::ApplicationScreen::MainMenu,"Did not return to usable menu");
@@ -90,6 +108,14 @@ int main(int argc,char** argv) {
             vc::voxel::WorldStore reopened(config.worldDirectory);vc::voxel::BlockRegistry blocks;
             const auto archive=reopened.load(blocks);require(archive&&archive->revision==static_cast<unsigned>(cycle+1),"Session did not save/release/reload world");
         }
+#if VC_HAS_VOXELUI
+        auto survivalConfig=config;survivalConfig.worldDirectory=temporary.path()/"survival-world";survivalConfig.survival=true;
+        app.startLocal(survivalConfig);until([&] { return app.screen()==vc::client::ApplicationScreen::Gameplay; },tick);
+        for(int step=0;step<4;++step) tick();
+        require(renderer->uiMetrics().drawCalls==1,"Survival session did not prepare the health HUD");
+        until([&] { return renderer->draw(vc::Camera{},captures/"voxelui-survival-hud.ppm"); },tick);
+        app.requestLeave();until([&] { return !app.hasSession(); },tick);
+#endif
         auto modded=config;modded.worldDirectory=temporary.path()/"modded-world";
         modded.noMods=false;modded.modsDirectory=vc::utf8Path(argv[2]);
         app.startLocal(modded);until([&] { return app.screen()==vc::client::ApplicationScreen::Gameplay; },tick);
@@ -111,7 +137,20 @@ int main(int argc,char** argv) {
             app.startRemote(remote);
             until([&] { return app.screen()==vc::client::ApplicationScreen::Gameplay&&app.renderer().meshCount()>0; },networkTick);
             require(server.playerCount()==1,"Remote session did not reach authoritative host");
-            app.requestLeave();until([&] { return !app.hasSession()&&server.playerCount()==0; },networkTick);
+#if VC_HAS_VOXELUI
+            if(cycle==0) {
+                vc::Input pause;pause.pause=true;app.frame(pause);
+                require(!SDL_GetWindowRelativeMouseMode(nativeWindow),"Pause did not release gameplay pointer capture");
+                const auto pausedAt=server.ticks();for(int step=0;step<4;++step) networkTick();
+                require(server.ticks()>pausedAt&&server.playerCount()==1,"Multiplayer pause stopped the authoritative session");
+                until([&] { return renderer->draw(vc::Camera{},captures/"voxelui-remote-pause.ppm"); },networkTick);
+                vc::Input next;next.text.tab=true;for(int step=0;step<3;++step) app.frame(next);
+                vc::Input enter;enter.text.enter=true;app.frame(enter);
+            } else app.requestLeave();
+#else
+            app.requestLeave();
+#endif
+            until([&] { return !app.hasSession()&&server.playerCount()==0; },networkTick);
             require(app.renderer().meshCount()==0,"Remote geometry survived disconnect");
         }
         // Same remote lifecycle can be cancelled while waiting for the handshake.

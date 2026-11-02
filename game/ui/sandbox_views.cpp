@@ -247,11 +247,11 @@ HudGeometry sandboxHud(const CreativeInventory& inventory,const voxel::BlockRegi
     const SandboxUiLayout layout(width,height,settings.uiScale);Painter p{{},{0,0,static_cast<float>(width),static_cast<float>(height)},layout.scale,theme};
     const auto screen=view?view->screen:settingsOpen?UiScreen::Settings:craftingOpen?UiScreen::Crafting:inventoryOpen?UiScreen::Inventory:UiScreen::Gameplay;
     if(screen==UiScreen::Gameplay||screen==UiScreen::Inventory||screen==UiScreen::Crafting)
-        drawHotbar(p,layout,inventory,blocks,atlas,survival,view,screen==UiScreen::Gameplay);
+        drawHotbar(p,layout,inventory,blocks,atlas,survival,view,screen==UiScreen::Gameplay&&(!view||!view->externalChrome));
     if(screen==UiScreen::Inventory) drawInventory(p,layout,inventory,blocks,atlas,survival,page,view);
     else if(screen==UiScreen::Crafting) drawCrafting(p,layout,blocks,atlas,survival,page,view);
     else if(screen==UiScreen::Settings) drawSettings(p,layout,settings,view);
-    else if(screen==UiScreen::Pause) drawPause(p,layout,view);
+    else if(screen==UiScreen::Pause&&(!view||!view->externalChrome)) drawPause(p,layout,view);
     else if(screen==UiScreen::Console&&view) drawConsole(p,layout,*view);
     if(survival&&!survival->state->alive()&&screen!=UiScreen::Console) {
         p.rect(layout.panel,theme.panel,true);p.frame(layout.panel,theme.border,1,true);
