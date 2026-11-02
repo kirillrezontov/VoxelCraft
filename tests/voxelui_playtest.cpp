@@ -8,6 +8,7 @@
 #include <voxelui/runtime.hpp>
 #include <SDL3/SDL_main.h>
 #include <array>
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 namespace {
@@ -53,6 +54,20 @@ int main(int argc,char** argv) {
         for(int x=0;x<32;++x) for(int z=0;z<32;++z) for(int y=0;y<8;++y) chunk.set({x,y,z},blocks.require(y==7?"voxelcraft:grass":"voxelcraft:stone"));
         world.insert(std::move(chunk));const auto mesh=vc::voxel::meshChunk(*world.findChunk({0,0,0}),world,blocks,vc::builtinAtlasLayout());renderer.upload(std::span(&mesh,1));
         ui.data().set("status","Same device, world and UI");require(frame(output/"world-ui.ppm"),"World/UI capture failed");require(renderer.drawnMeshCount()>0,"World mesh was not composed");
+        // Measure the complete host path too: mutation, input polling, runtime,
+        // owning commands, CPU surface raster/upload and actual world/UI submit.
+        for(bool changed:{false,true}) {
+            const auto begin=std::chrono::steady_clock::now();
+            for(int i=0;i<60;++i) {
+                if(changed) ui.data().set("status","Measured frame "+std::to_string(i));
+                require(frame(),"Measured world/UI frame was not submitted");
+                if(!changed) require(renderer.uiMetrics().uploadBytes==0,"Unchanged frame uploaded a UI surface");
+            }
+            const auto mean=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-begin).count()/60;
+            const auto measured=renderer.uiMetrics();
+            std::cout<<(changed?"Changed":"Unchanged")<<" world/UI frame mean "<<mean<<" us (60); last surface prepare "
+                <<measured.prepareMicroseconds<<" us, upload "<<measured.uploadBytes<<" bytes\n";
+        }
         // Replace the CPU screen while the previous submitted frame still owns GPU data.
         for(int cycle=0;cycle<12;++cycle) { ui.data().set("status","Screen replacement "+std::to_string(cycle));ui.close();checkUi(ui,ui.loadXml(R"(<Screen version="1" id="replacement" style="font-family:ui:DejaVuSans.ttf;color:#fff"><Text value="{status}" style="font-size:30dp"/></Screen>)"),"Screen reload failed");(void)frame(); }
         renderer.clearUi();(void)renderer.draw(camera);update();
