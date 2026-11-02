@@ -3,24 +3,24 @@
 The next-generation program has completed the modular core and application/session
 split. Milestone 3 implements the [native/data/resource/core extension foundation](docs/native-modding.md);
 its executed verification is recorded separately. Optional VoxelUI application
-menus, status/error screens and the reference Vulkan surface bridge are implemented.
-A native GPU DrawList adapter, gameplay-overlay migration and release hardening
-remain next. Existing release tasks below retain their original scope.
+menus, status/error screens, mode/health HUD and local/multiplayer pause controls
+are implemented through the reference Vulkan surface bridge. A native GPU DrawList
+adapter, inventory/settings/console migration and release hardening remain next.
+Existing release tasks below retain their original scope.
 
 
 Milestone 1's environment gates are now closed by the
 [unrestricted recheck](docs/modular-core-gate-recheck.json). Milestone 2 adds
 [ClientApplication and frame-driven local/remote sessions](docs/client-sessions.md)
 with repeated enter/leave, save retry, cancellation and strict Vulkan verification.
-Native modding/resource-pack contracts are the next implementation milestone.
+Native modding/resource-pack contracts are implemented; their verification and
+remaining limitations are recorded in [native modding](docs/native-modding.md).
 
 Milestone 1 implementation: separate voxel/generation/lighting/meshing libraries,
 owned persistence, checked module links and static mesher composition. Current
-verification and outstanding environment gates are recorded in
-[modularization progress](docs/modularization-progress.md); do not advance to
-[client sessions](docs/next-milestone-client-sessions.md) until that gate closes.
-Native SDK, VoxelUI Vulkan rendering, SVG redesign and legacy UI removal remain
-later milestones.
+verification is recorded in [modularization progress](docs/modularization-progress.md)
+and the unrestricted recheck above. Native GPU VoxelUI rendering and complete
+legacy UI removal remain later milestones.
 
 ## Current Milestone: v0.8.2 — UI/UX and Developer Console (release candidate)
 

@@ -1,0 +1,109 @@
+{
+  "date": "2026-11-02",
+  "implementation_commit": "44cdd47a5d29f28766e35d422ac27e396f860fef",
+  "branch": "main",
+  "merge_resolution": "da44947 incorporates feature/client-sessions tip 304432d without reverting newer native SDK, persistence and module boundaries",
+  "voxelui": {
+    "package_version": "0.2.1",
+    "runtime_commit": "c7633ca",
+    "documentation_commit": "8e6b3e3",
+    "core_named_cases": 66,
+    "debug_seconds": 6.19,
+    "release_seconds": 1.01,
+    "asan_ubsan_leak_enabled_seconds": 38.73,
+    "installed_public_consumer": "passed",
+    "visual_regressions": "six example PNGs byte-identical; primitive hash 12769330923178300131; separate scaled padding/clip correction test",
+    "performance_report": "../VoxelUI/docs/performance-before-after.md (separate repository)",
+    "measured_endpoint": "716ddf4 before Select-only resource reload follow-up",
+    "same_machine_update_to_commands_us": {
+      "one_text_in_clipped_1000_element_column": { "before": 487.26, "after": 65.82 },
+      "keyed_rotation_200": { "before": 1205.53, "after": 289.49 },
+      "mixed_svg_list": { "before": 287.51, "after": 83.71 },
+      "fully_visible_1000_text_grid": { "before": 460.61, "after": 431.28 }
+    },
+    "performance_scope": "five alternating Release pairs on CPU 2, same compiler/hardware and benchmark source; clipped-leaf command omission contributes most of the column gain; traversal still visits the tree"
+  },
+  "environment": {
+    "os": "Linux x86_64, EndeavourOS/Arch",
+    "cpu": "AMD Ryzen 7 2700, 8 cores / 16 threads",
+    "gcc": "16.2.1",
+    "clang_sanitizer": "23.1.3",
+    "cmake": "4.4.4 with Ninja",
+    "gpu": "NVIDIA RTX 3050, driver 615.78.08",
+    "display": "project-local Xvfb :93 with Openbox, SDL X11 and hardware NVIDIA Vulkan",
+    "validation": "project-local Khronos layer with synchronization validation; no system package installation"
+  },
+  "scope": {
+    "declarative_views": ["main menu", "connection form", "loading/saving", "recoverable error", "creative mode HUD", "survival health HUD", "local/multiplayer pause controls"],
+    "legacy_views": ["hotbar item icons", "inventory", "crafting", "settings", "console", "death"],
+    "rendering": "owning DrawList snapshots, transparent CPU surface, one quad on the existing Vulkan device; unchanged snapshots do not rasterize or upload",
+    "input": "one pause event recipient, queued typed commands, focus/capture cancellation, held mining cancellation and coalesced input guard",
+    "ownership": "application owns adapter and resource providers; sessions borrow it and are destroyed first; no callback captures session state",
+    "enable": "VC_ENABLE_VOXELUI=ON with explicit source directory or installed 0.2.1 package; default legacy build stays available"
+  },
+  "results": {
+    "debug_cpu_cli": { "passed": 256, "total": 256, "seconds": 5.02, "log": "/tmp/voxelcraft-gameplay-reviewed-tests.log" },
+    "release_cpu_cli": { "passed": 256, "total": 256, "seconds": 4.10, "log": "/tmp/voxelcraft-gameplay-reviewed-release-tests.log" },
+    "clang_asan_ubsan_cpu_cli": { "passed": 256, "total": 256, "seconds": 23.38, "log": "/tmp/voxelcraft-gameplay-reviewed-asan-tests.log" },
+    "installed_package_host": { "passed": 5, "total": 5, "seconds": 0.34, "client_help": "passed", "log": "/tmp/voxelcraft-gameplay-reviewed-installed-tests.log" },
+    "legacy_without_voxelui_cpu_cli": { "passed": 251, "total": 251, "seconds": 8.10, "log": "/tmp/voxelcraft-gameplay-legacy-tests.log" },
+    "legacy_session_graphics": { "passed": 1, "total": 1, "seconds": 11.82, "log": "/tmp/voxelcraft-gameplay-final-scenes-legacy.log" },
+    "full_debug_graphics": {
+      "passed": 15,
+      "total": 15,
+      "seconds": 215.41,
+      "log": "/tmp/voxelcraft-gameplay-final-graphics.log",
+      "scope": "complete migration suite before final coalesced-input guard; UI/session scenes rerun after that guard and survival-session extension"
+    },
+    "final_debug_ui_session_graphics": {
+      "passed": 2,
+      "total": 2,
+      "seconds": 37.34,
+      "validation_errors": 0,
+      "validation_warnings": 0,
+      "log": "/tmp/voxelcraft-gameplay-reviewed-scenes-debug.log"
+    },
+    "final_release_ui_session_graphics": {
+      "passed": 2,
+      "total": 2,
+      "seconds": 25.66,
+      "validation_errors": 0,
+      "validation_warnings": 0,
+      "log": "/tmp/voxelcraft-gameplay-reviewed-scenes-release.log"
+    }
+  },
+  "sanitizers": {
+    "cpu_options": "ASAN_OPTIONS=detect_leaks=1:halt_on_error=1; UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1",
+    "gpu_leak_status": "unresolved; earlier leak-enabled Vulkan runs completed functional checks but failed LSan",
+    "earlier_gpu_reports_bytes_and_allocations": {
+      "VoxelUI_scene": [79274, 930],
+      "session_scene": [12506, 9],
+      "legacy_SDL_host_without_VoxelUI_runtime": [6898, 6]
+    },
+    "attribution": "SDL/X11/DBus and unmapped-module traces occur, including the legacy control; full attribution is not established and no suppression was applied",
+    "logs": ["/tmp/voxelcraft-asan-ui-gpu.log", "/tmp/voxelcraft-asan-host-only-gpu.log"]
+  },
+  "earlier_release_bridge_frame_sample": {
+    "iterations_each": 60,
+    "unchanged_frame_mean_us": 32699.3,
+    "changed_frame_mean_us": 48757.8,
+    "last_changed_prepare_us": 15852.2,
+    "last_changed_upload_bytes": 2457600,
+    "unchanged_upload_bytes": 0,
+    "gpu_timestamps_available": false,
+    "scope": "complete fixture world/UI frame, including poll/runtime/commands/host draw and submission, measured before gameplay migration; not a controlled host before/after comparison or a GPU-only timing",
+    "log": "/tmp/voxelcraft-release-ui-gpu.log"
+  },
+  "captures": ["screenshots/voxelui/creative-hud.png", "screenshots/voxelui/survival-hud.png", "screenshots/voxelui/pause.png"],
+  "windows": {
+    "current_work": "deferred at user request; separate Windows loader draft remains stashed",
+    "provided_historical_log": "213/219 passed; six Client CLI tests exited 0xc0000135 before main; current changes have no Windows verification"
+  },
+  "next": [
+    "Native external Vulkan DrawList adapter with glyph/image caches, vector mesh reuse, frame retirement and conformance images",
+    "Inventory/crafting migration using host-owned atlas resources, followed by settings/console",
+    "Resolve GPU process leak attribution and run sustained human playtests",
+    "VoxelUI regional keyed insertion/removal and large Value collection-copy costs"
+  ],
+  "readiness": "Working opt-in integration and incremental runtime foundation; partial UI migration, no stable binary ABI or production-readiness claim"
+}

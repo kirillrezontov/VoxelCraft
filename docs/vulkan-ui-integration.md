@@ -3,8 +3,11 @@
 VoxelUI now drives the optional application main menu, editable connection form,
 loading/saving status and recoverable error screen. XML, CSS and the SVG mark live
 in `assets/resources/voxelcraft/ui`. Actions queue Play/Connect/Back/Quit intents;
-the application executes them after UI dispatch. Gameplay inventory, HUD, console,
-pause and settings retain their existing implementation for this migration stage.
+the application executes them after UI dispatch. The mode/health HUD and pause
+menu now also use XML/CSS/SVG in both local and multiplayer sessions. Resume,
+Settings, Save and Return to main menu queue commands into the existing session
+state machine. Hotbar icons, inventory, crafting, settings, death and console
+views retain their existing renderer and behavior during this migration stage.
 
 ## Build
 
@@ -42,11 +45,16 @@ backend, glyph atlas or reusable SVG mesh implementation.
 
 All image/mesh creation, descriptor replacement and retirement occur after the
 existing frame fence. Uploads use the existing synchronous texture upload path;
-changed large surfaces can stall and should not be used for a high-frequency HUD.
+changed large surfaces can stall. The current HUD displays discrete mode/health
+changes and avoids per-frame counters; a native adapter is needed before adding
+frequently changing HUD elements. Stable snapshots produce no surface uploads.
 Unchanged frames retain the texture and issue one quad. `clearUi` immediately stops
 using the snapshot and defers GPU destruction until that fence, or device-idle
 shutdown. Minimized frames submit nothing. Resize uses the ordinary swapchain path.
-A session entering gameplay clears status chrome before its first world frame.
+A session entering gameplay replaces status chrome with its HUD before presenting
+the world. Inventory/settings/console/death clear the declarative surface; returning
+to gameplay rebuilds the appropriate view. A frame with no prepared gameplay view
+retires the previous status snapshot.
 
 `UiRenderMetrics` reports surface preparation time, uploaded RGBA bytes, quad draws
 and logical texture bytes. GPU timestamps are **unavailable**, reported explicitly;
@@ -70,14 +78,76 @@ replacement. No LayoutNode pointers are kept by the host. Runtime/model operatio
 stay on the application thread. Native SDK 1.0 does not expose UI callbacks; future
 native UI extensions must unregister and quiesce before unloading executable code.
 
+`SessionEnvironment` borrows the application-owned adapter; sessions are destroyed
+before it. No UI callback captures a world, controller, network peer or coroutine.
+`SandboxUiController` remains the authority for overlay state: single player pauses
+simulation, multiplayer isolates input while the server keeps running. Legacy pause
+hit regions and health drawing are disabled only when the new host chrome is active.
+Pause input goes to one widget system; transitions cancel held mining/movement.
+Callbacks only queue intent, which is consumed after dispatch. Invalid screens or
+coalesced Escape/toggle events discard stale pause actions. Resource packs may
+override `ui/hud.xml`, `ui/pause.xml` and `ui/gameplay.css` with the usual fallback.
+
 ## Verification and next task
 
 Public host tests cover actual menu editing/actions, invalid XML/CSS pack recovery,
-widget unregistration and snapshots surviving runtime destruction. The real graphics
+widget unregistration, changing health pixels, stable HUD snapshots, all pause
+commands, focus-loss capture cancellation and snapshots surviving runtime destruction.
+The real graphics
 playtest covers UI-only/world composition, screen replacement, resource reload,
 resize, minimize/restore and shutdown. Application/session and existing graphics
-regressions remain enabled. Exact final results are in `integration-results.json`.
+regressions remain enabled. The application playtest exercises XML pause navigation,
+persisted settings/return navigation and multiplayer pause/disconnect without changing
+renderer ownership. Exact results and platform limitations are in
+[integration-results.json](integration-results.json).
+
+Linux checks for implementation `44cdd47`:
+
+| Configuration | Result |
+|---|---|
+| GCC Debug / Release CPU and CLI | 256 / 256 in each |
+| Clang ASan + UBSan, leak detection enabled, CPU and CLI | 256 / 256 |
+| Installed VoxelUI package, independent host cases | 5 / 5; client `--help` passed |
+| VoxelUI disabled, fresh build | 251 / 251 CPU and CLI; session graphics passed |
+| Full Debug Vulkan regression gate | 15 / 15 before final coalesced-input guard |
+| Final UI + session graphics, Debug / Release | 2 / 2 in each after that guard; zero validation errors/warnings |
+
+The host pixel oracle compares reused and fresh runtimes at 640×480 and 1920×1080
+with UI scale 1.75. Actual Vulkan captures show the
+[creative HUD](screenshots/voxelui/creative-hud.png),
+[survival HUD](screenshots/voxelui/survival-hud.png) and
+[pause menu](screenshots/voxelui/pause.png). Capture cameras isolate the UI; these
+are screen evidence, not performance or world-visual acceptance baselines.
+
+Reproduce CPU checks using the build command above, `CMAKE_BUILD_TYPE=Release`
+for the optimized build, or `CMAKE_CXX_COMPILER=clang++`,
+`CMAKE_C_COMPILER=clang`, `VC_SANITIZER=address-undefined` for sanitizer builds:
+
+```sh
+ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 \
+UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+ctest --test-dir build/ui-asan -LE graphics --output-on-failure
+ctest --test-dir build/ui-integration -L graphics --output-on-failure
+```
+
+Graphics tests require a Vulkan-capable display/window manager that acknowledges
+minimize/restore, plus Khronos validation with synchronization checks enabled. This
+run used project-local Xvfb/Openbox with the hardware NVIDIA ICD. The CPU sanitizer
+gate is clean. Earlier leak-enabled **graphics** runs failed LSan; a legacy SDL-only
+control also reports leaks, but full attribution remains unresolved. No suppression
+or claim of a clean GPU leak check is made. Windows work is deferred; the supplied
+historical 213/219 Windows CTest log is recorded separately in the JSON.
+
+The earlier 60-frame Release bridge sample measured 32.70 ms per unchanged
+world/UI frame and 48.76 ms per changed frame; the last changed surface preparation
+was 15.85 ms and uploaded 2,457,600 bytes. These are complete fixture-frame means,
+not GPU timestamps, a controlled host before/after comparison, or current gameplay
+frame-rate guarantees. Idle gameplay now has an explicit zero-upload assertion.
+VoxelUI's controlled runtime before/after measurements are in the separate
+repository's `docs/performance-before-after.md`; fully visible label emission and
+regional list insertion/removal remain significant costs.
 
 Next: define a native GPU DrawList adapter with conformance images, bounded glyph
-and image caches, and frame-completion retirement before migrating dynamic gameplay
-overlays. Do not interpret this reference bridge as completing that optimization.
+and image caches, and frame-completion retirement; then migrate inventory/crafting
+with host-owned atlas resources, and settings/console. Do not interpret this
+reference bridge as completing GPU optimization or the full UI migration.
