@@ -1,0 +1,1096 @@
+{
+  "date": "2026-11-01",
+  "starting_branch": "main",
+  "starting_commit": "82d7f28570d3340b0633786b7725bd175cbd768d",
+  "recovery_commit": "460a4f3",
+  "implementation_commit": "5ec739613e88a0930da91c2bd493638ceda072d2",
+  "cmake_path_commit": "3e12bcc8719fb3d2c6065279526e9b517e00b3a0",
+  "branch": "feature/modular-core-foundation",
+  "environment": {
+    "platform": "Linux x86_64",
+    "cpu": "AMD Ryzen 7 5800H",
+    "gpu": "AMD Radeon Graphics (RADV RENOIR)",
+    "gcc": "16.2.1",
+    "clang": "22.1.8",
+    "cmake": "4.4.3",
+    "ninja": "1.13.2",
+    "graphics": "isolated KWin virtual Wayland, Khronos core/synchronization validation"
+  },
+  "results": {
+    "baseline_gcc_build": "passed",
+    "baseline_cpu_cli": {
+      "passed": 211,
+      "failed": 0
+    },
+    "baseline_graphics": {
+      "passed": 12,
+      "failed": 0
+    },
+    "candidate_gcc_build": "passed",
+    "candidate_cpu_cli": {
+      "passed": 216,
+      "failed": 0
+    },
+    "candidate_graphics": {
+      "passed": 12,
+      "failed": 0
+    },
+    "asan_ubsan": {
+      "passed": 197,
+      "failed": 0,
+      "environment": "detect_leaks=1:halt_on_error=1; UBSan halt_on_error=1:print_stacktrace=1"
+    },
+    "tsan_worker_snapshot_core": {
+      "passed": 14,
+      "failed": 0,
+      "environment": "halt_on_error=1"
+    },
+    "server_only_build_and_runtime": "passed; client OFF, testing OFF; executable target only; no SDL/Vulkan discovery, no UI/meshing compile",
+    "baseline_save_compatibility": "passed; copied baseline survival world with example mods loaded revision 1 and saved revision 2; original retained",
+    "dependency_guard_fixtures": "acyclic accepted, cycle and forbidden transitive edge rejected",
+    "clean_committed_build": {
+      "commit": "1ef0722ff0893d5591912171607a537bf79138b2",
+      "fresh_dependency_downloads": true,
+      "full_client_server_build": "passed",
+      "cpu_cli": {
+        "passed": 216,
+        "failed": 0
+      },
+      "compiler_input_audit": {
+        "project_inputs": 187,
+        "missing": [],
+        "project_translation_units": 110,
+        "original_worktree_references": 0
+      },
+      "graphics": {
+        "passed": 12,
+        "failed": 0
+      }
+    },
+    "packages": "Client/server TGZ archives generated; both extracted CPU smoke tests and --gpu extracted-client rendering/persistence checks passed",
+    "windows_msvc": "not executed",
+    "sustained_human_gameplay": "not executed",
+    "tracking_audit": "zero findings in both repositories, 16 explicit inputs tracked in clean source"
+  },
+  "recovery_audit": {
+    "tracked_and_original_hash_matched": 54,
+    "missing": 0
+  },
+  "performance": {
+    "configuration": "GCC RelWithDebInfo, VC_BUILD_CLIENT=OFF, BUILD_TESTING=OFF, VC_BUILD_SOAK_TOOLS=ON; vc_mesh_benchmark",
+    "baseline": "82d7f28",
+    "candidate": "5ec7396 (unchanged benchmark/mesher/generator algorithms)",
+    "workload": "fixed seed 42, 150 chunks; 3 exploratory/warmup pairs then 7 measured pairs, alternating order",
+    "limits": "shared machine, variable clocks, no CPU affinity; CPU times only, background wall includes 1 ms polling; not a GPU/frame/allocation study or speedup guarantee",
+    "data": {
+      "Unit faces (reference)": {
+        "perf-before": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.018,
+              "call_p95_ms": 2.031,
+              "call_max_ms": 3.014,
+              "main_cpu_ms": 69.361,
+              "wall_ms": 70.716,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.017,
+              "call_p95_ms": 2.018,
+              "call_max_ms": 3.132,
+              "main_cpu_ms": 69.004,
+              "wall_ms": 70.623,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.017,
+              "call_p95_ms": 2.062,
+              "call_max_ms": 3.289,
+              "main_cpu_ms": 70.777,
+              "wall_ms": 72.5,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.018,
+              "call_p95_ms": 2.176,
+              "call_max_ms": 3.683,
+              "main_cpu_ms": 73.914,
+              "wall_ms": 76.298,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 2.322,
+              "call_max_ms": 3.815,
+              "main_cpu_ms": 75.979,
+              "wall_ms": 77.723,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 2.018,
+              "call_max_ms": 3.199,
+              "main_cpu_ms": 70.253,
+              "wall_ms": 71.499,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 2.256,
+              "call_max_ms": 3.065,
+              "main_cpu_ms": 73.98,
+              "wall_ms": 76.047,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.018,
+              "call_p95_ms": 2.379,
+              "call_max_ms": 4.0,
+              "main_cpu_ms": 77.317,
+              "wall_ms": 79.079,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 2.144,
+              "call_max_ms": 3.987,
+              "main_cpu_ms": 73.811,
+              "wall_ms": 75.18,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.021,
+              "call_p95_ms": 2.29,
+              "call_max_ms": 3.699,
+              "main_cpu_ms": 76.776,
+              "wall_ms": 78.444,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 73.98,
+          "measured_main_cpu_range_ms": [
+            70.253,
+            77.317
+          ]
+        },
+        "perf-after": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 2.188,
+              "call_max_ms": 3.222,
+              "main_cpu_ms": 73.927,
+              "wall_ms": 75.599,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.018,
+              "call_p95_ms": 2.143,
+              "call_max_ms": 3.164,
+              "main_cpu_ms": 73.674,
+              "wall_ms": 75.383,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 2.028,
+              "call_max_ms": 3.247,
+              "main_cpu_ms": 69.792,
+              "wall_ms": 71.493,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.018,
+              "call_p95_ms": 2.0,
+              "call_max_ms": 3.223,
+              "main_cpu_ms": 68.144,
+              "wall_ms": 69.366,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.021,
+              "call_p95_ms": 2.311,
+              "call_max_ms": 4.041,
+              "main_cpu_ms": 78.63,
+              "wall_ms": 80.507,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 2.031,
+              "call_max_ms": 3.431,
+              "main_cpu_ms": 70.002,
+              "wall_ms": 71.153,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 2.283,
+              "call_max_ms": 3.364,
+              "main_cpu_ms": 76.286,
+              "wall_ms": 78.002,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 2.26,
+              "call_max_ms": 3.522,
+              "main_cpu_ms": 76.197,
+              "wall_ms": 77.894,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 2.237,
+              "call_max_ms": 3.462,
+              "main_cpu_ms": 73.982,
+              "wall_ms": 75.421,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 639600.0,
+              "triangles": 319800.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 2.268,
+              "call_max_ms": 3.253,
+              "main_cpu_ms": 76.564,
+              "wall_ms": 78.201,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 76.197,
+          "measured_main_cpu_range_ms": [
+            68.144,
+            78.63
+          ]
+        }
+      },
+      "Greedy opaque faces": {
+        "perf-before": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.366,
+              "call_max_ms": 1.868,
+              "main_cpu_ms": 53.101,
+              "wall_ms": 53.117,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.39,
+              "call_max_ms": 1.816,
+              "main_cpu_ms": 53.555,
+              "wall_ms": 53.571,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.369,
+              "call_max_ms": 1.9,
+              "main_cpu_ms": 52.948,
+              "wall_ms": 52.964,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 1.374,
+              "call_max_ms": 1.867,
+              "main_cpu_ms": 53.522,
+              "wall_ms": 53.538,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.021,
+              "call_p95_ms": 1.415,
+              "call_max_ms": 2.016,
+              "main_cpu_ms": 56.184,
+              "wall_ms": 56.213,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.405,
+              "call_max_ms": 2.01,
+              "main_cpu_ms": 55.249,
+              "wall_ms": 55.266,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.405,
+              "call_max_ms": 1.983,
+              "main_cpu_ms": 54.961,
+              "wall_ms": 54.978,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.022,
+              "call_p95_ms": 1.419,
+              "call_max_ms": 1.989,
+              "main_cpu_ms": 55.387,
+              "wall_ms": 55.406,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 1.429,
+              "call_max_ms": 1.968,
+              "main_cpu_ms": 55.167,
+              "wall_ms": 55.185,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 1.446,
+              "call_max_ms": 2.089,
+              "main_cpu_ms": 55.738,
+              "wall_ms": 55.758,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 55.249,
+          "measured_main_cpu_range_ms": [
+            53.522,
+            56.184
+          ]
+        },
+        "perf-after": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.018,
+              "call_p95_ms": 1.352,
+              "call_max_ms": 1.851,
+              "main_cpu_ms": 52.061,
+              "wall_ms": 52.076,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.402,
+              "call_max_ms": 1.902,
+              "main_cpu_ms": 54.215,
+              "wall_ms": 54.231,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.376,
+              "call_max_ms": 1.898,
+              "main_cpu_ms": 53.79,
+              "wall_ms": 53.806,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.02,
+              "call_p95_ms": 1.367,
+              "call_max_ms": 1.882,
+              "main_cpu_ms": 53.215,
+              "wall_ms": 53.233,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.486,
+              "call_max_ms": 2.206,
+              "main_cpu_ms": 56.567,
+              "wall_ms": 56.588,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.436,
+              "call_max_ms": 1.978,
+              "main_cpu_ms": 55.17,
+              "wall_ms": 55.187,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.432,
+              "call_max_ms": 2.026,
+              "main_cpu_ms": 55.159,
+              "wall_ms": 55.177,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.021,
+              "call_p95_ms": 1.43,
+              "call_max_ms": 2.079,
+              "main_cpu_ms": 55.615,
+              "wall_ms": 55.635,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.44,
+              "call_max_ms": 2.217,
+              "main_cpu_ms": 56.215,
+              "wall_ms": 56.233,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.019,
+              "call_p95_ms": 1.421,
+              "call_max_ms": 1.999,
+              "main_cpu_ms": 55.169,
+              "wall_ms": 55.188,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 55.17,
+          "measured_main_cpu_range_ms": [
+            53.215,
+            56.567
+          ]
+        }
+      },
+      "Synchronous (budget 2)": {
+        "perf-before": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.455,
+              "call_p95_ms": 2.426,
+              "call_max_ms": 2.769,
+              "main_cpu_ms": 53.258,
+              "wall_ms": 53.265,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.457,
+              "call_p95_ms": 2.636,
+              "call_max_ms": 2.811,
+              "main_cpu_ms": 54.024,
+              "wall_ms": 54.031,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.456,
+              "call_p95_ms": 2.402,
+              "call_max_ms": 2.767,
+              "main_cpu_ms": 52.486,
+              "wall_ms": 52.493,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.475,
+              "call_p95_ms": 2.501,
+              "call_max_ms": 2.765,
+              "main_cpu_ms": 52.963,
+              "wall_ms": 52.971,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.496,
+              "call_p95_ms": 2.382,
+              "call_max_ms": 2.809,
+              "main_cpu_ms": 53.834,
+              "wall_ms": 53.842,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.46,
+              "call_p95_ms": 2.425,
+              "call_max_ms": 2.842,
+              "main_cpu_ms": 54.914,
+              "wall_ms": 54.921,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.462,
+              "call_p95_ms": 2.395,
+              "call_max_ms": 2.827,
+              "main_cpu_ms": 54.611,
+              "wall_ms": 54.619,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.475,
+              "call_p95_ms": 2.443,
+              "call_max_ms": 2.88,
+              "main_cpu_ms": 54.772,
+              "wall_ms": 54.78,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.457,
+              "call_p95_ms": 2.487,
+              "call_max_ms": 2.844,
+              "main_cpu_ms": 54.663,
+              "wall_ms": 54.67,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.465,
+              "call_p95_ms": 2.415,
+              "call_max_ms": 2.828,
+              "main_cpu_ms": 55.006,
+              "wall_ms": 55.013,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 54.663,
+          "measured_main_cpu_range_ms": [
+            52.963,
+            55.006
+          ]
+        },
+        "perf-after": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.444,
+              "call_p95_ms": 2.338,
+              "call_max_ms": 2.804,
+              "main_cpu_ms": 53.36,
+              "wall_ms": 53.367,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.506,
+              "call_p95_ms": 2.691,
+              "call_max_ms": 2.899,
+              "main_cpu_ms": 56.498,
+              "wall_ms": 56.505,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.458,
+              "call_p95_ms": 2.438,
+              "call_max_ms": 2.837,
+              "main_cpu_ms": 53.812,
+              "wall_ms": 53.82,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.447,
+              "call_p95_ms": 2.378,
+              "call_max_ms": 2.724,
+              "main_cpu_ms": 52.876,
+              "wall_ms": 52.884,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.463,
+              "call_p95_ms": 2.352,
+              "call_max_ms": 2.767,
+              "main_cpu_ms": 55.349,
+              "wall_ms": 55.358,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.472,
+              "call_p95_ms": 2.437,
+              "call_max_ms": 2.832,
+              "main_cpu_ms": 54.691,
+              "wall_ms": 54.698,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.45,
+              "call_p95_ms": 2.393,
+              "call_max_ms": 2.831,
+              "main_cpu_ms": 54.207,
+              "wall_ms": 54.215,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.46,
+              "call_p95_ms": 2.399,
+              "call_max_ms": 2.828,
+              "main_cpu_ms": 54.624,
+              "wall_ms": 54.633,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.456,
+              "call_p95_ms": 2.443,
+              "call_max_ms": 2.865,
+              "main_cpu_ms": 55.126,
+              "wall_ms": 55.134,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.456,
+              "call_p95_ms": 2.404,
+              "call_max_ms": 2.847,
+              "main_cpu_ms": 54.753,
+              "wall_ms": 54.761,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 54.691,
+          "measured_main_cpu_range_ms": [
+            52.876,
+            55.349
+          ]
+        }
+      },
+      "Background (snapshot budget 2)": {
+        "perf-before": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.075,
+              "call_p95_ms": 0.119,
+              "call_max_ms": 0.127,
+              "main_cpu_ms": 6.052,
+              "wall_ms": 86.608,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.079,
+              "call_p95_ms": 0.104,
+              "call_max_ms": 0.127,
+              "main_cpu_ms": 6.057,
+              "wall_ms": 86.67,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.072,
+              "call_p95_ms": 0.117,
+              "call_max_ms": 0.147,
+              "main_cpu_ms": 5.832,
+              "wall_ms": 86.381,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.09,
+              "call_p95_ms": 0.172,
+              "call_max_ms": 0.333,
+              "main_cpu_ms": 8.433,
+              "wall_ms": 93.027,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.087,
+              "call_p95_ms": 0.148,
+              "call_max_ms": 0.182,
+              "main_cpu_ms": 7.745,
+              "wall_ms": 94.392,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.082,
+              "call_p95_ms": 0.166,
+              "call_max_ms": 0.23,
+              "main_cpu_ms": 7.54,
+              "wall_ms": 94.168,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.086,
+              "call_p95_ms": 0.149,
+              "call_max_ms": 0.241,
+              "main_cpu_ms": 7.769,
+              "wall_ms": 91.361,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.084,
+              "call_p95_ms": 0.181,
+              "call_max_ms": 0.245,
+              "main_cpu_ms": 7.851,
+              "wall_ms": 90.506,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.085,
+              "call_p95_ms": 0.221,
+              "call_max_ms": 0.359,
+              "main_cpu_ms": 8.495,
+              "wall_ms": 90.045,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.089,
+              "call_p95_ms": 0.193,
+              "call_max_ms": 0.226,
+              "main_cpu_ms": 8.231,
+              "wall_ms": 90.88,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 7.851,
+          "measured_main_cpu_range_ms": [
+            7.54,
+            8.495
+          ]
+        },
+        "perf-after": {
+          "samples": [
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.079,
+              "call_p95_ms": 0.113,
+              "call_max_ms": 0.144,
+              "main_cpu_ms": 6.137,
+              "wall_ms": 88.721,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.085,
+              "call_p95_ms": 0.131,
+              "call_max_ms": 0.177,
+              "main_cpu_ms": 6.908,
+              "wall_ms": 88.545,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.083,
+              "call_p95_ms": 0.121,
+              "call_max_ms": 0.141,
+              "main_cpu_ms": 6.551,
+              "wall_ms": 88.305,
+              "phase": "warmup/exploratory"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.093,
+              "call_p95_ms": 0.191,
+              "call_max_ms": 0.283,
+              "main_cpu_ms": 9.138,
+              "wall_ms": 96.843,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.089,
+              "call_p95_ms": 0.208,
+              "call_max_ms": 0.245,
+              "main_cpu_ms": 8.467,
+              "wall_ms": 93.037,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.092,
+              "call_p95_ms": 0.18,
+              "call_max_ms": 0.231,
+              "main_cpu_ms": 7.822,
+              "wall_ms": 89.418,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.089,
+              "call_p95_ms": 0.161,
+              "call_max_ms": 0.193,
+              "main_cpu_ms": 7.714,
+              "wall_ms": 91.234,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.088,
+              "call_p95_ms": 0.196,
+              "call_max_ms": 0.387,
+              "main_cpu_ms": 8.051,
+              "wall_ms": 89.625,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.09,
+              "call_p95_ms": 0.159,
+              "call_max_ms": 0.226,
+              "main_cpu_ms": 7.774,
+              "wall_ms": 90.41,
+              "phase": "measured"
+            },
+            {
+              "chunks": 150.0,
+              "vertices": 185836.0,
+              "triangles": 92918.0,
+              "call_median_ms": 0.086,
+              "call_p95_ms": 0.149,
+              "call_max_ms": 0.229,
+              "main_cpu_ms": 7.543,
+              "wall_ms": 91.076,
+              "phase": "measured"
+            }
+          ],
+          "measured_main_cpu_median_ms": 7.822,
+          "measured_main_cpu_range_ms": [
+            7.543,
+            9.138
+          ]
+        }
+      }
+    }
+  },
+  "changed_files": [
+    "CMakeLists.txt",
+    "CMakePresets.json",
+    "README.md",
+    "ROADMAP.md",
+    "client/main.cpp",
+    "client/network_client.cpp",
+    "cmake/EngineModules.cmake",
+    "cmake/ModuleBoundaries.cmake",
+    "docs/architecture.md",
+    "docs/building.md",
+    "docs/core-extension-points.md",
+    "docs/modular-architecture.md",
+    "docs/modular-core-results.json",
+    "docs/modularization-progress.md",
+    "docs/module-dependency-graph.md",
+    "docs/next-milestone-client-sessions.md",
+    "engine/core/content_presentation.hpp",
+    "engine/core/resource_types.hpp",
+    "engine/renderer/texture.hpp",
+    "engine/voxel/mesher.hpp",
+    "engine/voxel/registry.hpp",
+    "engine/voxel/terrain_worker.cpp",
+    "engine/voxel/terrain_worker.hpp",
+    "engine/voxel/terrain_worker.inl",
+    "examples/core_modules/layered_generator.hpp",
+    "examples/core_modules/main.cpp",
+    "game/content/services.cpp",
+    "game/content/services.hpp",
+    "game/network/content_fingerprint.cpp",
+    "game/network/content_fingerprint.hpp",
+    "game/network/protocol.cpp",
+    "game/network/protocol.hpp",
+    "server/host.cpp",
+    "tests/content_services_tests.cpp",
+    "tests/core_module_tests.cpp",
+    "tests/network_playtest.cpp",
+    "tests/network_survival_playtest.cpp",
+    "tests/protocol_tests.cpp"
+  ],
+  "fresh_dependency_revisions": {
+    "glm": "0af55ccecd98d4e5a8d1fad7de25ba429d60e863",
+    "entt": "4a2d1a8541228a90e02a873dba6a980506c42c03",
+    "nlohmann_json": "55f93686c01528224f448c19128836e7df245f72",
+    "googletest": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
+    "sdl3": "877399b2b2cf21e67554ed9046410f268ce1d1b2"
+  },
+  "compatibility_content_fingerprint": "390040753740130847 (identical baseline and candidate with example mods)"
+}

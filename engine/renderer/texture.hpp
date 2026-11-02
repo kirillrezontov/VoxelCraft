@@ -1,10 +1,10 @@
 #pragma once
+#include "engine/core/resource_types.hpp"
 #include <glm/vec2.hpp>
 #include <cstdint>
 #include <vector>
 
 namespace vc {
-using TextureTile = std::uint16_t;
 struct ImageRgba {
     std::uint32_t width{}, height{};
     std::vector<std::uint8_t> pixels;

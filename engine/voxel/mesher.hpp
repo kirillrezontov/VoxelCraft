@@ -1,5 +1,6 @@
 #pragma once
 #include "engine/renderer/mesh.hpp"
+#include "engine/renderer/texture.hpp"
 #include "engine/voxel/world.hpp"
 #include <concepts>
 

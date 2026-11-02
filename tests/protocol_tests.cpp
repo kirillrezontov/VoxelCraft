@@ -1,3 +1,4 @@
+#include "game/modding/runtime.hpp"
 #include "game/network/protocol.hpp"
 #include "game/content/blocks.hpp"
 #include "game/player/save_state.hpp"

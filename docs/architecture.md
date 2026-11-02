@@ -382,3 +382,9 @@ supply issuer or role. Only authenticated profile keys can receive persisted rol
 console alone grants/revokes. Resource caps, audit redaction, migration and syntax
 are documented in [commands](v0.8.2-commands.md). Player payload 10 appends explicit
 per-profile mode and spawn fields; versions 1..9 and metadata/regions 1 remain readable.
+
+The client-sessions branch is reconciled with the newer native SDK/session owners.
+Generation and streaming have separate CMake targets; physics depends on voxel data,
+while rendering interchange types do not own GPU objects. Content fingerprinting
+lives beside content composition and remains callable through the protocol header.
+The default TerrainWorker is an alias of the concept-constrained BasicTerrainWorker.
