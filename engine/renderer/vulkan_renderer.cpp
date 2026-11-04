@@ -339,6 +339,8 @@ struct VulkanRenderer::Impl {
         if (!layers.empty()) info.pNext = &debugInfo;
         vkCheck(vkCreateInstance(&info, nullptr, &instance), "Create Vulkan 1.3 instance (check graphics driver)");
         if (!layers.empty()) {
+            // The instance-only feature chain is not valid on messenger creation.
+            debugInfo.pNext=nullptr;
             const auto create = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT"));
             if (!create) throw std::runtime_error("VK_EXT_debug_utils entry point unavailable");
             vkCheck(create(instance, &debugInfo, nullptr, &debug), "Create validation messenger");
