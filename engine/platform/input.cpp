@@ -120,8 +120,11 @@ void InputState::process(const SDL_Event& event) {
         break;
     }
     case SDL_EVENT_MOUSE_BUTTON_UP:
-        if(pointerMode_&&event.button.button==SDL_BUTTON_LEFT&&std::isfinite(event.button.x)&&std::isfinite(event.button.y))
-            appendUi({.type=UiInputEvent::Type::pointerUp,.x=event.button.x,.y=event.button.y});
+        if(pointerMode_&&event.button.button==SDL_BUTTON_LEFT) {
+            if(std::isfinite(event.button.x)&&std::isfinite(event.button.y))
+                appendUi({.type=UiInputEvent::Type::pointerUp,.x=event.button.x,.y=event.button.y});
+            else appendUi({.type=UiInputEvent::Type::focusLost});
+        }
         if (event.button.button == SDL_BUTTON_LEFT) { pending_.primaryRelease=leftHeld_;leftHeld_ = false;leftEditArmed_=false; }
         if (event.button.button == SDL_BUTTON_RIGHT) rightHeld_ = false;
         break;
@@ -156,7 +159,7 @@ void InputState::process(const SDL_Event& event) {
             const auto steps=static_cast<int>(wheelRemainder_);
             wheelRemainder_-=static_cast<float>(steps);
             pending_.scroll=std::clamp(pending_.scroll+steps,-100,100);
-            if(pointerMode_) appendUi({.type=UiInputEvent::Type::wheel,.x=cursorX_,.y=cursorY_,.delta=event.wheel.y*direction});
+            if(pointerMode_) appendUi({.type=UiInputEvent::Type::wheel,.x=cursorX_,.y=cursorY_,.delta=std::clamp(event.wheel.y*direction,-100.f,100.f)});
         }
         break;
     default: break;

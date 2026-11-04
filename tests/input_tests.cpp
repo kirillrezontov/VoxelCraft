@@ -39,6 +39,11 @@ TEST(Input, OrderedUiEventsOwnTextAndPreserveReleasePositionsAndRepeatedKeys) {
     EXPECT_EQ(input.uiEvents[3].key,SDL_SCANCODE_BACKSPACE);EXPECT_EQ(input.uiEvents[4].key,SDL_SCANCODE_BACKSPACE);
     EXPECT_TRUE(input.primaryClick);EXPECT_TRUE(input.primaryRelease);EXPECT_FALSE(input.primaryHeld);
     EXPECT_TRUE(state.consume().uiEvents.empty());
+    up.button.x=std::numeric_limits<float>::quiet_NaN();state.process(up);
+    auto invalid=state.consume();ASSERT_EQ(invalid.uiEvents.size(),1);
+    EXPECT_EQ(invalid.uiEvents[0].type,vc::UiInputEvent::Type::focusLost);
+    SDL_Event wheel{};wheel.type=SDL_EVENT_MOUSE_WHEEL;wheel.wheel.y=std::numeric_limits<float>::max();state.process(wheel);
+    invalid=state.consume();ASSERT_EQ(invalid.uiEvents.size(),1);EXPECT_EQ(invalid.uiEvents[0].delta,100);
 }
 TEST(Input, OrderedUiOverflowCancelsCaptureAndRecoversNextPoll) {
     vc::InputState state;state.setPointerMode(true);SDL_Event move{};move.type=SDL_EVENT_MOUSE_MOTION;
