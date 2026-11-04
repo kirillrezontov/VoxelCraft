@@ -2,11 +2,24 @@
 #include <SDL3/SDL_events.h>
 #include <array>
 #include <cstdint>
+#include <vector>
+#include <string>
 #include "engine/ui/text_edit.hpp"
 
 namespace vc {
+struct UiInputEvent {
+    enum class Type { pointerMove,pointerDown,pointerUp,wheel,keyDown,textInput,composition,focusLost };
+    Type type{};
+    float x{},y{},delta{};
+    SDL_Scancode key{SDL_SCANCODE_UNKNOWN};
+    bool control{},shift{};
+    std::string text{};
+};
 struct Input {
     std::uint64_t pollNanoseconds{};
+    // Owning, ordered UI stream alongside the unchanged gameplay snapshot.
+    std::vector<UiInputEvent> uiEvents;
+    bool orderedUiEvents{},uiEventsOverflow{};
     bool quit{}, resized{}, captured{}, focusLost{};
     bool quitWithoutSaving{};
     bool destroy{}, place{}, jump{}, toggleFlight{}, save{};
@@ -41,5 +54,7 @@ private:
     float cursorX_{},cursorY_{},wheelRemainder_{};
     std::array<bool, SDL_SCANCODE_COUNT> keys_{};
     Input pending_;
+    std::size_t uiEventBytes_{};
+    void appendUi(UiInputEvent);
 };
 }

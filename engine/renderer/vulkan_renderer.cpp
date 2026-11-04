@@ -35,20 +35,27 @@ void vkCheck(VkResult result, const char* operation) {
 }
 // Move-only ownership also cleans up partially initialized buffers on exceptions.
 struct Buffer {
+    GpuResourceMetrics* resources{};
+    bool staging{};
     VkDevice device{};
     VkBuffer handle{};
     VkDeviceMemory memory{};
+    VkDeviceSize capacity{};
+    void* mapping{};
     Buffer() = default;
     Buffer(const Buffer&) = delete;
     Buffer& operator=(const Buffer&) = delete;
     Buffer(Buffer&& other) noexcept { swap(other); }
     Buffer& operator=(Buffer&& other) noexcept { Buffer temporary(std::move(other)); swap(temporary); return *this; }
     ~Buffer() {
-        if (handle) vkDestroyBuffer(device, handle, nullptr);
-        if (memory) vkFreeMemory(device, memory, nullptr);
+        if(mapping) vkUnmapMemory(device,memory);
+        if (handle) { vkDestroyBuffer(device, handle, nullptr);resources->buffers.release();if(staging) resources->stagingBuffers.release(); }
+        if (memory) { vkFreeMemory(device, memory, nullptr);resources->memory.release(); }
     }
     void swap(Buffer& other) noexcept {
         std::swap(device, other.device); std::swap(handle, other.handle); std::swap(memory, other.memory);
+        std::swap(capacity,other.capacity);std::swap(mapping,other.mapping);
+        std::swap(resources,other.resources);std::swap(staging,other.staging);
     }
 };
 struct GpuMesh {
@@ -60,25 +67,28 @@ static_assert(sizeof(PushConstants)==128);
 struct InstanceData { glm::vec3 offset{};float yaw{};glm::vec2 light{1,0};float phase{},padding{}; };
 static_assert(sizeof(InstanceData)==32);
 struct Texture {
+    GpuResourceMetrics* resources{};
     VkDevice device{};
     VkImage image{};
     VkDeviceMemory memory{};
     VkImageView view{};
     VkSampler sampler{};
+    std::uint32_t width{},height{};
     Texture() = default;
     Texture(const Texture&) = delete;
     Texture& operator=(const Texture&) = delete;
     ~Texture() {
-        if (sampler) vkDestroySampler(device, sampler, nullptr);
-        if (view) vkDestroyImageView(device, view, nullptr);
-        if (image) vkDestroyImage(device, image, nullptr);
-        if (memory) vkFreeMemory(device, memory, nullptr);
+        if (sampler) { vkDestroySampler(device, sampler, nullptr);resources->samplers.release(); }
+        if (view) { vkDestroyImageView(device, view, nullptr);resources->imageViews.release(); }
+        if (image) { vkDestroyImage(device, image, nullptr);resources->images.release(); }
+        if (memory) { vkFreeMemory(device, memory, nullptr);resources->memory.release(); }
     }
 };
 }
 
 struct VulkanRenderer::ValidationState {
-    bool enabled{};
+    GpuResourceMetrics resources;
+    bool enabled{},synchronizationEnabled{};
     std::atomic<std::uint32_t> errors{}, warnings{};
     static VKAPI_ATTR VkBool32 VKAPI_CALL callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
             VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT* data, void* user) noexcept {
@@ -96,6 +106,8 @@ struct VulkanRenderer::Impl {
     voxelui::SoftwareRenderer uiRaster;
     std::unique_ptr<Texture> uiTexture;
     GpuMesh uiQuad;
+    Buffer uiStaging;
+    bool uiUploadPending{},uiTextureUploaded{};
     VkDescriptorSet uiDescriptor{};
     UiRenderMetrics uiMetrics;
     bool uiDirty{};
@@ -105,27 +117,39 @@ struct VulkanRenderer::Impl {
     void prepareUi() {
         uiMetrics = {};
         if (!uiList) {
-            uiTexture.reset();uiQuad={};
+            uiTexture.reset();uiQuad={};uiStaging={};uiUploadPending=uiTextureUploaded=false;
             return;
         }
         if (uiDirty) {
             const auto begin = std::chrono::steady_clock::now();
             { profile::Scope timing(profile::Stage::software);uiRaster.render(*uiList, {0,0,0,0}); }
-            ImageRgba image{static_cast<std::uint32_t>(uiRaster.width()),static_cast<std::uint32_t>(uiRaster.height()),uiRaster.pixels()};
-            auto next = createTexture(image);
-            Mesh quad;
-            const float w=static_cast<float>(image.width),h=static_cast<float>(image.height);
-            quad.vertices={{{0,0,0},{1,1,1},{0,0}},{{w,0,0},{1,1,1},{1,0}},{{w,h,0},{1,1,1},{1,1}},{{0,h,0},{1,1,1},{0,1}}};
-            quad.indices={0,1,2,2,3,0};
-            auto mesh=createMesh(quad);
-            updateTextureDescriptor(0,*next,uiDescriptor);
-            updateTextureDescriptor(1,*next,uiDescriptor);
-            uiTexture=std::move(next);uiQuad=std::move(mesh);uiDirty=false;
-            uiMetrics.uploadBytes=image.pixels.size();
-            profile::uploadBytes(image.pixels.size());
+            const auto width=static_cast<std::uint32_t>(uiRaster.width()),height=static_cast<std::uint32_t>(uiRaster.height());
+            if(!uiTexture||uiTexture->width!=width||uiTexture->height!=height) {
+                auto next=allocateTexture(width,height);
+                Mesh quad;const float w=static_cast<float>(width),h=static_cast<float>(height);
+                quad.vertices={{{0,0,0},{1,1,1},{0,0}},{{w,0,0},{1,1,1},{1,0}},{{w,h,0},{1,1,1},{1,1}},{{0,h,0},{1,1,1},{0,1}}};
+                quad.indices={0,1,2,2,3,0};auto mesh=createMesh(quad);
+                updateTextureDescriptor(0,*next,uiDescriptor);updateTextureDescriptor(1,*next,uiDescriptor);
+                uiTexture=std::move(next);uiQuad=std::move(mesh);uiTextureUploaded=false;
+            }
+            const auto& pixels=uiRaster.pixels();
+            if(uiStaging.capacity<pixels.size()) {
+                auto staging=createBuffer(pixels.size(),VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+                vkCheck(vkMapMemory(device,staging.memory,0,staging.capacity,0,&staging.mapping),"Map reusable UI staging");
+                uiStaging=std::move(staging);
+            }
+            { profile::Scope timing(profile::Stage::upload);std::memcpy(uiStaging.mapping,pixels.data(),pixels.size()); }
+            uiUploadPending=true;uiDirty=false;
             uiMetrics.prepareMicroseconds=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-begin).count();
         }
         uiMetrics.residentBytes=static_cast<std::size_t>(uiRaster.width())*static_cast<std::size_t>(uiRaster.height())*4;
+    }
+    void recordUiUpload() {
+        if(!uiUploadPending) return;
+        recordTextureUpload(*uiTexture,uiStaging,uiTextureUploaded);
+        uiMetrics.uploadBytes=static_cast<std::size_t>(uiTexture->width)*uiTexture->height*4;
+        profile::uploadBytes(uiMetrics.uploadBytes);
+        uiUploadPending=false;uiTextureUploaded=true;
     }
 #endif
     Window& window;
@@ -165,6 +189,7 @@ struct VulkanRenderer::Impl {
     VkDescriptorSetLayout descriptorLayout{};
     VkDescriptorPool descriptorPool{};
     VkDescriptorSet descriptor{};
+    std::size_t descriptorSetCount{};
     std::vector<GpuMesh> meshes;
     std::vector<GpuMesh> models;
     std::vector<RenderInstance> instances;
@@ -188,14 +213,17 @@ struct VulkanRenderer::Impl {
             const auto result = vkDeviceWaitIdle(device);
             if (result != VK_SUCCESS) log("Device wait during shutdown returned " + std::to_string(result));
 #if VC_HAS_VOXELUI
-            uiTexture.reset();uiQuad={};uiList.reset();
+            uiTexture.reset();uiQuad={};uiList.reset();uiStaging={};
 #endif
             meshes.clear();
             models.clear();instanceBuffer={};
             outline = {}; crosshair = {};hudColors={};hudTextures={};hudForeground={};progressBack={};progressFill={};
             destroySwapchain();
             if (pipelineLayout) vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-            if (descriptorPool) vkDestroyDescriptorPool(device, descriptorPool, nullptr);
+            if (descriptorPool) {
+                vkDestroyDescriptorPool(device, descriptorPool, nullptr);validation.resources.descriptorPools.release();
+                while(descriptorSetCount) { validation.resources.descriptorSets.release();--descriptorSetCount; }
+            }
             if (descriptorLayout) vkDestroyDescriptorSetLayout(device, descriptorLayout, nullptr);
             atlasTexture.reset();fontTexture.reset();
             if (acquired) vkDestroySemaphore(device, acquired, nullptr);
@@ -263,6 +291,8 @@ struct VulkanRenderer::Impl {
         debugInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         debugInfo.pfnUserCallback = ValidationState::callback;
         debugInfo.pUserData = &validation;
+        const VkValidationFeatureEnableEXT syncFeature=VK_VALIDATION_FEATURE_ENABLE_SYNCHRONIZATION_VALIDATION_EXT;
+        auto validationFeatures=vkStructure<VkValidationFeaturesEXT>(VK_STRUCTURE_TYPE_VALIDATION_FEATURES_EXT);
         bool wantValidation = requireValidation;
 #ifndef NDEBUG
         wantValidation = true;
@@ -281,6 +311,17 @@ struct VulkanRenderer::Impl {
                 layers.push_back("VK_LAYER_KHRONOS_validation");
                 extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
                 validation.enabled = true;
+                if(requireValidation) {
+                    vkCheck(vkEnumerateInstanceExtensionProperties("VK_LAYER_KHRONOS_validation",&count,nullptr),"Enumerate validation extensions");
+                    std::vector<VkExtensionProperties> layerExtensions(count);
+                    vkCheck(vkEnumerateInstanceExtensionProperties("VK_LAYER_KHRONOS_validation",&count,layerExtensions.data()),"Enumerate validation extensions");
+                    if(!std::ranges::any_of(layerExtensions,[](const auto& extension) { return std::strcmp(extension.extensionName,VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME)==0; }))
+                        throw std::runtime_error("--require-validation needs VK_EXT_validation_features for synchronization validation");
+                    extensions.push_back(VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME);
+                    validationFeatures.enabledValidationFeatureCount=1;validationFeatures.pEnabledValidationFeatures=&syncFeature;
+                    debugInfo.pNext=&validationFeatures;validation.synchronizationEnabled=true;
+                    log("Khronos synchronization validation enabled");
+                }
                 log("Khronos validation enabled");
             } else {
                 if (requireValidation) throw std::runtime_error("--require-validation needs VK_LAYER_KHRONOS_validation and VK_EXT_debug_utils");
@@ -380,16 +421,19 @@ struct VulkanRenderer::Impl {
         throw std::runtime_error("No GPU memory type supports the required flags");
     }
     Buffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data = nullptr) const {
-        Buffer result; result.device = device;
+        Buffer result; result.device = device;result.capacity=size;result.resources=&validation.resources;
+        result.staging=(usage&VK_BUFFER_USAGE_TRANSFER_SRC_BIT)!=0;
         {
         profile::Scope timing(profile::Stage::allocation);
         auto info = vkStructure<VkBufferCreateInfo>(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO); info.size = size; info.usage = usage; info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         vkCheck(vkCreateBuffer(device, &info, nullptr, &result.handle), "Create mesh/readback buffer");
+        validation.resources.buffers.acquire();if(result.staging) validation.resources.stagingBuffers.acquire();
         VkMemoryRequirements requirements{}; vkGetBufferMemoryRequirements(device, result.handle, &requirements);
         auto alloc = vkStructure<VkMemoryAllocateInfo>(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
         alloc.allocationSize = requirements.size;
         alloc.memoryTypeIndex = memoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkCheck(vkAllocateMemory(device, &alloc, nullptr, &result.memory), "Allocate buffer memory");
+        validation.resources.memory.acquire();
         vkCheck(vkBindBufferMemory(device, result.handle, result.memory, 0), "Bind buffer memory");
         }
         if (data) {
@@ -433,53 +477,66 @@ struct VulkanRenderer::Impl {
         auto info = vkStructure<VkImageViewCreateInfo>(VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO);
         info.image = image; info.viewType = VK_IMAGE_VIEW_TYPE_2D; info.format = format;
         info.subresourceRange = {aspect, 0, 1, 0, 1};
-        VkImageView view{}; vkCheck(vkCreateImageView(device, &info, nullptr, &view), "Create image view"); return view;
+        VkImageView view{}; vkCheck(vkCreateImageView(device, &info, nullptr, &view), "Create image view");
+        validation.resources.imageViews.acquire();return view;
     }
 
-    std::unique_ptr<Texture> createTexture(const ImageRgba& image,bool linear=false) {
+    std::unique_ptr<Texture> allocateTexture(std::uint32_t width,std::uint32_t height,bool linear=false) {
         VkPhysicalDeviceProperties properties{}; vkGetPhysicalDeviceProperties(physical, &properties);
-        if (image.width > properties.limits.maxImageDimension2D || image.height > properties.limits.maxImageDimension2D)
+        if (!width||!height||width > properties.limits.maxImageDimension2D || height > properties.limits.maxImageDimension2D)
             throw std::runtime_error("Texture atlas exceeds GPU image dimensions");
         VkFormatProperties format{}; vkGetPhysicalDeviceFormatProperties(physical, VK_FORMAT_R8G8B8A8_SRGB, &format);
         const auto required = VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
         if ((format.optimalTilingFeatures & required) != required) throw std::runtime_error("GPU cannot sample/upload RGBA8 sRGB textures");
-        auto texture = std::make_unique<Texture>(); texture->device = device;
+        auto texture = std::make_unique<Texture>(); texture->device = device;texture->width=width;texture->height=height;texture->resources=&validation.resources;
         auto info = vkStructure<VkImageCreateInfo>(VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO);
         info.imageType = VK_IMAGE_TYPE_2D; info.format = VK_FORMAT_R8G8B8A8_SRGB;
-        info.extent = {image.width, image.height, 1}; info.mipLevels = 1; info.arrayLayers = 1;
+        info.extent = {width,height,1}; info.mipLevels = 1; info.arrayLayers = 1;
         info.samples = VK_SAMPLE_COUNT_1_BIT; info.tiling = VK_IMAGE_TILING_OPTIMAL;
         info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         {
         profile::Scope timing(profile::Stage::allocation);
         vkCheck(vkCreateImage(device, &info, nullptr, &texture->image), "Create texture atlas image");
+        validation.resources.images.acquire();
         VkMemoryRequirements requirements{}; vkGetImageMemoryRequirements(device, texture->image, &requirements);
         auto alloc = vkStructure<VkMemoryAllocateInfo>(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
         alloc.allocationSize = requirements.size;
         alloc.memoryTypeIndex = memoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         vkCheck(vkAllocateMemory(device, &alloc, nullptr, &texture->memory), "Allocate texture atlas memory");
+        validation.resources.memory.acquire();
         vkCheck(vkBindImageMemory(device, texture->image, texture->memory, 0), "Bind texture atlas memory");
         }
-        auto staging = createBuffer(image.pixels.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, image.pixels.data());
-        auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
-        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        vkCheck(vkResetCommandBuffer(command,0),"Reset texture upload commands");
-        vkCheck(vkBeginCommandBuffer(command, &begin), "Begin atlas upload");
-        barrier(texture->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT);
-        VkBufferImageCopy copy{}; copy.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1}; copy.imageExtent = info.extent;
-        vkCmdCopyBufferToImage(command, staging.handle, texture->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
-        barrier(texture->image, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT);
-        vkCheck(vkEndCommandBuffer(command), "End atlas upload");
-        auto submit = vkStructure<VkSubmitInfo>(VK_STRUCTURE_TYPE_SUBMIT_INFO);
-        submit.commandBufferCount = 1; submit.pCommandBuffers = &command;
-        vkCheck(vkQueueSubmit(graphicsQueue, 1, &submit, VK_NULL_HANDLE), "Submit atlas upload");
-        { profile::Scope timing(profile::Stage::synchronization);profile::queueIdle();vkCheck(vkQueueWaitIdle(graphicsQueue), "Wait for atlas upload"); }
         texture->view = createView(texture->image, info.format, VK_IMAGE_ASPECT_COLOR_BIT);
         auto sampler = vkStructure<VkSamplerCreateInfo>(VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO);
         sampler.magFilter = sampler.minFilter = linear?VK_FILTER_LINEAR:VK_FILTER_NEAREST; sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
         sampler.addressModeU = sampler.addressModeV = sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
         vkCheck(vkCreateSampler(device, &sampler, nullptr, &texture->sampler), "Create atlas sampler");
+        validation.resources.samplers.acquire();
+        return texture;
+    }
+    void recordTextureUpload(const Texture& texture,const Buffer& staging,bool uploaded=false) {
+        barrier(texture.image,VK_IMAGE_ASPECT_COLOR_BIT,uploaded?VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,uploaded?VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT:VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,uploaded?VK_ACCESS_SHADER_READ_BIT:0,VK_ACCESS_TRANSFER_WRITE_BIT);
+        VkBufferImageCopy copy{};copy.imageSubresource={VK_IMAGE_ASPECT_COLOR_BIT,0,0,1};copy.imageExtent={texture.width,texture.height,1};
+        vkCmdCopyBufferToImage(command,staging.handle,texture.image,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,1,&copy);
+        barrier(texture.image,VK_IMAGE_ASPECT_COLOR_BIT,VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VK_PIPELINE_STAGE_TRANSFER_BIT,VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,VK_ACCESS_TRANSFER_WRITE_BIT,VK_ACCESS_SHADER_READ_BIT);
+    }
+    std::unique_ptr<Texture> createTexture(const ImageRgba& image,bool linear=false) {
+        auto texture=allocateTexture(image.width,image.height,linear);
+        auto staging = createBuffer(image.pixels.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, image.pixels.data());
+        auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
+        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkCheck(vkResetCommandBuffer(command,0),"Reset texture upload commands");
+        vkCheck(vkBeginCommandBuffer(command, &begin), "Begin atlas upload");
+        recordTextureUpload(*texture,staging);
+        vkCheck(vkEndCommandBuffer(command), "End atlas upload");
+        auto submit = vkStructure<VkSubmitInfo>(VK_STRUCTURE_TYPE_SUBMIT_INFO);
+        submit.commandBufferCount = 1; submit.pCommandBuffers = &command;
+        vkCheck(vkResetFences(device,1,&frameFence),"Reset texture upload fence");
+        vkCheck(vkQueueSubmit(graphicsQueue, 1, &submit, frameFence), "Submit atlas upload");
+        waitFrame("Wait for texture upload");
         return texture;
     }
 
@@ -494,12 +551,15 @@ struct VulkanRenderer::Impl {
         auto pool=vkStructure<VkDescriptorPoolCreateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO);
         pool.maxSets=2;pool.poolSizeCount=1;pool.pPoolSizes=&size;
         vkCheck(vkCreateDescriptorPool(device,&pool,nullptr,&descriptorPool),"Create texture descriptor pool");
+        validation.resources.descriptorPools.acquire();
         auto alloc=vkStructure<VkDescriptorSetAllocateInfo>(VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO);
         alloc.descriptorPool=descriptorPool;alloc.descriptorSetCount=1;alloc.pSetLayouts=&descriptorLayout;
         vkCheck(vkAllocateDescriptorSets(device,&alloc,&descriptor),"Allocate texture descriptors");
+        validation.resources.descriptorSets.acquire();++descriptorSetCount;
         updateTextureDescriptor(0,*atlasTexture);updateTextureDescriptor(1,*fontTexture);
 #if VC_HAS_VOXELUI
         vkCheck(vkAllocateDescriptorSets(device,&alloc,&uiDescriptor),"Allocate UI texture descriptors");
+        validation.resources.descriptorSets.acquire();++descriptorSetCount;
 #endif
     }
     void updateTextureDescriptor(std::uint32_t binding,const Texture& texture,VkDescriptorSet target={}) {
@@ -517,11 +577,11 @@ struct VulkanRenderer::Impl {
         hudPipeline=VK_NULL_HANDLE;
         if (pipeline) vkDestroyPipeline(device, pipeline, nullptr);
         pipeline = VK_NULL_HANDLE;
-        if (depthView) vkDestroyImageView(device, depthView, nullptr);
-        if (depthImage) vkDestroyImage(device, depthImage, nullptr);
-        if (depthMemory) vkFreeMemory(device, depthMemory, nullptr);
+        if (depthView) { vkDestroyImageView(device, depthView, nullptr);validation.resources.imageViews.release(); }
+        if (depthImage) { vkDestroyImage(device, depthImage, nullptr);validation.resources.images.release(); }
+        if (depthMemory) { vkFreeMemory(device, depthMemory, nullptr);validation.resources.memory.release(); }
         depthView = VK_NULL_HANDLE; depthImage = VK_NULL_HANDLE; depthMemory = VK_NULL_HANDLE;
-        for (auto view : views) vkDestroyImageView(device, view, nullptr);
+        for (auto view : views) { vkDestroyImageView(device, view, nullptr);validation.resources.imageViews.release(); }
         for (auto semaphore : presented) if (semaphore) vkDestroySemaphore(device, semaphore, nullptr);
         views.clear(); presented.clear(); images.clear();
         if (swapchain) vkDestroySwapchainKHR(device, swapchain, nullptr);
@@ -594,10 +654,12 @@ struct VulkanRenderer::Impl {
         depth.mipLevels = 1; depth.arrayLayers = 1; depth.samples = VK_SAMPLE_COUNT_1_BIT; depth.tiling = VK_IMAGE_TILING_OPTIMAL;
         depth.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT; depth.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         vkCheck(vkCreateImage(device, &depth, nullptr, &depthImage), "Create depth image");
+        validation.resources.images.acquire();
         VkMemoryRequirements requirements{}; vkGetImageMemoryRequirements(device, depthImage, &requirements);
         auto alloc = vkStructure<VkMemoryAllocateInfo>(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO); alloc.allocationSize = requirements.size;
         alloc.memoryTypeIndex = memoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         vkCheck(vkAllocateMemory(device, &alloc, nullptr, &depthMemory), "Allocate depth memory");
+        validation.resources.memory.acquire();
         vkCheck(vkBindImageMemory(device, depthImage, depthMemory, 0), "Bind depth memory");
         depthView = createView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
         createPipeline();
@@ -769,6 +831,9 @@ struct VulkanRenderer::Impl {
         vkCheck(vkResetCommandBuffer(command, 0), "Reset command buffer");
         auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO); begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkCheck(vkBeginCommandBuffer(command, &begin), "Begin frame commands");
+#if VC_HAS_VOXELUI
+        recordUiUpload();
+#endif
         const bool queryUi=uiQueries&&profile::active();
         if(queryUi) vkCmdResetQueryPool(command,uiQueries,0,2);
 
@@ -905,8 +970,9 @@ VulkanRenderer::VulkanRenderer(Window& window, const ImageRgba& atlas, bool requ
 VulkanRenderer::~VulkanRenderer() = default;
 void VulkanRenderer::shutdown() { impl_.reset(); }
 ValidationReport VulkanRenderer::validationReport() const {
-    return {validation_->enabled, validation_->errors.load(), validation_->warnings.load()};
+    return {validation_->enabled, validation_->errors.load(), validation_->warnings.load(),validation_->synchronizationEnabled};
 }
+GpuResourceMetrics VulkanRenderer::resourceMetrics() const { return validation_->resources; }
 void VulkanRenderer::requestResize() { impl_->dirty = true; }
 void VulkanRenderer::replaceAtlas(const ImageRgba& image) {
     image.validate();

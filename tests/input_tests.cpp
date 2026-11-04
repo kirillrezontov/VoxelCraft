@@ -24,6 +24,30 @@ TEST(Input, CaptureClickDoesNotEditAndHeldButtonDoesNotRepeat) {
     state.process(button(SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_BUTTON_RIGHT));
     EXPECT_TRUE(state.consume().place); EXPECT_FALSE(state.consume().place);
 }
+TEST(Input, OrderedUiEventsOwnTextAndPreserveReleasePositionsAndRepeatedKeys) {
+    vc::InputState state;state.setPointerMode(true);state.setTextInput(true);
+    auto down=button(SDL_EVENT_MOUSE_BUTTON_DOWN,SDL_BUTTON_LEFT);down.button.x=10;down.button.y=20;state.process(down);
+    auto up=button(SDL_EVENT_MOUSE_BUTTON_UP,SDL_BUTTON_LEFT);up.button.x=100;up.button.y=200;state.process(up);
+    std::string text="Привет";SDL_Event event{};event.type=SDL_EVENT_TEXT_INPUT;event.text.text=text.c_str();state.process(event);
+    text="changed after SDL dispatch";
+    state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_BACKSPACE));
+    state.process(key(SDL_EVENT_KEY_DOWN,SDL_SCANCODE_BACKSPACE,true));
+    const auto input=state.consume();ASSERT_TRUE(input.orderedUiEvents);ASSERT_EQ(input.uiEvents.size(),5);
+    EXPECT_EQ(input.uiEvents[0].type,vc::UiInputEvent::Type::pointerDown);EXPECT_EQ(input.uiEvents[0].x,10);
+    EXPECT_EQ(input.uiEvents[1].type,vc::UiInputEvent::Type::pointerUp);EXPECT_EQ(input.uiEvents[1].x,100);
+    EXPECT_EQ(input.uiEvents[2].text,"Привет");
+    EXPECT_EQ(input.uiEvents[3].key,SDL_SCANCODE_BACKSPACE);EXPECT_EQ(input.uiEvents[4].key,SDL_SCANCODE_BACKSPACE);
+    EXPECT_TRUE(input.primaryClick);EXPECT_TRUE(input.primaryRelease);EXPECT_FALSE(input.primaryHeld);
+    EXPECT_TRUE(state.consume().uiEvents.empty());
+}
+TEST(Input, OrderedUiOverflowCancelsCaptureAndRecoversNextPoll) {
+    vc::InputState state;state.setPointerMode(true);SDL_Event move{};move.type=SDL_EVENT_MOUSE_MOTION;
+    for(int i=0;i<2048;++i) state.process(move);
+    auto input=state.consume();ASSERT_TRUE(input.uiEventsOverflow);ASSERT_EQ(input.uiEvents.size(),1);
+    EXPECT_EQ(input.uiEvents[0].type,vc::UiInputEvent::Type::focusLost);
+    state.process(move);input=state.consume();EXPECT_FALSE(input.uiEventsOverflow);ASSERT_EQ(input.uiEvents.size(),1);
+    EXPECT_EQ(input.uiEvents[0].type,vc::UiInputEvent::Type::pointerMove);
+}
 TEST(Input, HeldMovementPersistsAndOpposingKeysCancel) {
     vc::InputState state; state.setCaptured(true);
     state.process(key(SDL_EVENT_KEY_DOWN, SDL_SCANCODE_W));

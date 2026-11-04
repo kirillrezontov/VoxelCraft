@@ -56,6 +56,10 @@ Input Window::poll() {
     if(logicalWidth>0&&logicalHeight>0&&pixelWidth>0&&pixelHeight>0) {
         input.cursorX*=static_cast<float>(pixelWidth)/static_cast<float>(logicalWidth);
         input.cursorY*=static_cast<float>(pixelHeight)/static_cast<float>(logicalHeight);
+        for(auto& ordered:input.uiEvents) {
+            ordered.x*=static_cast<float>(pixelWidth)/static_cast<float>(logicalWidth);
+            ordered.y*=static_cast<float>(pixelHeight)/static_cast<float>(logicalHeight);
+        }
     }
     if(measure) input.pollNanoseconds=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
         std::chrono::steady_clock::now()-begin).count());

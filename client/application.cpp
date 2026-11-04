@@ -43,6 +43,7 @@ struct ClientApplication::Impl {
     float scale{1},left{},top{};
 #if VC_HAS_VOXELUI
     std::unique_ptr<DeclarativeUi> declarative;
+    bool menuPrepared{};
 #endif
     GameSession session; // Destroy first, before every borrowed application owner.
 
@@ -102,7 +103,7 @@ struct ClientApplication::Impl {
         const bool retained=std::any_of(widgets.widgets().begin(),widgets.widgets().end(),[&](const auto& widget){return widget.id==focus;});
         widgets.focus(retained?focus:screens.current()==ApplicationScreen::Error?"back":"play");dirty=true;
     }
-    void chrome() {
+    void chrome(bool emit=true) {
         if(screens.current()==ApplicationScreen::Gameplay) {
 #if VC_HAS_VOXELUI
             if(painted!=ApplicationScreen::Gameplay&&!host.gameplayUiPrepared) renderer.clearUi();
@@ -113,10 +114,15 @@ struct ClientApplication::Impl {
         const auto size=window.pixelSize();
         if(size.first<=0||size.second<=0) { dirty=true;return; }
 #if VC_HAS_VOXELUI
-        width=size.first;height=size.second;painted=screens.current();
-        declarative->update(screens.current(),screens.message(),width,height,static_cast<float>(preferences.settings.uiScale));
-        renderer.setUi(declarative->draw());
+        if(!menuPrepared||width!=size.first||height!=size.second||painted!=screens.current()||paintedMessage!=screens.message()) {
+            width=size.first;height=size.second;painted=screens.current();paintedMessage=screens.message();
+            declarative->update(screens.current(),screens.message(),width,height,static_cast<float>(preferences.settings.uiScale));
+            menuPrepared=true;
+        }
+        if(emit) renderer.setUi(declarative->draw());
         return;
+#else
+        (void)emit;
 #endif
         if(width!=size.first||height!=size.second||painted!=screens.current()||paintedMessage!=screens.message()) {
             width=size.first;height=size.second;painted=screens.current();paintedMessage=screens.message();layout();
@@ -202,9 +208,9 @@ struct ClientApplication::Impl {
         if(!running) return;
         if(input.resized) renderer.requestResize();
 #if VC_HAS_VOXELUI
-        host.gameplayUiPrepared=false;
+        host.gameplayUiPrepared=false;menuPrepared=false;
 #endif
-        chrome();host.presented=false;
+        chrome(active);host.presented=false;
         if(active) {
             if(input.quit) host.quitRequested=true;
             if(screens.current()==ApplicationScreen::Loading&&(input.closeUi||input.pause)) host.leaveRequested=true;

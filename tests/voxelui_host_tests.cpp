@@ -42,6 +42,23 @@ TEST(VoxelUiHost, InvalidPackScreenAndStylesRecoverThroughBuiltinProvider) {
     ui.reload();EXPECT_NO_THROW(ui.update(vc::client::ApplicationScreen::MainMenu,"",960,640,1));
     vc::Input enter;enter.text.enter=true;ui.process(enter);EXPECT_EQ(ui.takeAction(),vc::client::MenuAction::Play);
 }
+TEST(VoxelUiHost, OrderedTextEditsAndRepeatedBackspaceAreAppliedWithinTheSamePoll) {
+    const std::filesystem::path assets=VC_UI_ASSET_DIR;vc::ResourceCatalog resources(assets/"resources");
+    vc::client::DeclarativeUi ui(resources,assets/"fonts","localhost","Player");
+    ui.update(vc::client::ApplicationScreen::MainMenu,"",960,700,1);tab(ui);replace(ui,"");
+    vc::Input input;input.orderedUiEvents=true;
+    using E=vc::UiInputEvent;using T=E::Type;
+    input.uiEvents={{.type=T::textInput,.text="ac"},{.type=T::keyDown,.key=SDL_SCANCODE_LEFT},
+        {.type=T::textInput,.text="b"},{.type=T::keyDown,.key=SDL_SCANCODE_BACKSPACE}};
+    ui.process(input);EXPECT_EQ(ui.address(),"ac");
+    input.uiEvents={{.type=T::keyDown,.key=SDL_SCANCODE_END},{.type=T::keyDown,.key=SDL_SCANCODE_BACKSPACE},
+        {.type=T::keyDown,.key=SDL_SCANCODE_BACKSPACE}};
+    ui.process(input);EXPECT_EQ(ui.address(),"");
+    // Enter queues Play; the following Tab is discarded with the old screen.
+    ui.update(vc::client::ApplicationScreen::Error,"error",960,700,1);
+    input.uiEvents={{.type=T::keyDown,.key=SDL_SCANCODE_RETURN},{.type=T::keyDown,.key=SDL_SCANCODE_TAB}};
+    ui.process(input);EXPECT_EQ(ui.takeAction(),vc::client::MenuAction::Back);
+}
 TEST(VoxelUiHost, PublicWidgetRegistrationUnregisterAndOwningSnapshots) {
     struct Gauge {
         voxelui::Vec2 measure(const voxelui::Node&,voxelui::Vec2) { return {30,12}; }
