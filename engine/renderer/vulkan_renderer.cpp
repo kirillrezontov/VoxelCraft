@@ -2,6 +2,7 @@
 #include <voxelui/software.hpp>
 #endif
 #include "engine/core/paths.hpp"
+#include "engine/core/frame_profile.hpp"
 #include "engine/renderer/vulkan_renderer.hpp"
 #include "engine/renderer/overlay.hpp"
 #include "engine/renderer/frustum.hpp"
@@ -109,7 +110,7 @@ struct VulkanRenderer::Impl {
         }
         if (uiDirty) {
             const auto begin = std::chrono::steady_clock::now();
-            uiRaster.render(*uiList, {0,0,0,0});
+            { profile::Scope timing(profile::Stage::software);uiRaster.render(*uiList, {0,0,0,0}); }
             ImageRgba image{static_cast<std::uint32_t>(uiRaster.width()),static_cast<std::uint32_t>(uiRaster.height()),uiRaster.pixels()};
             auto next = createTexture(image);
             Mesh quad;
@@ -121,6 +122,7 @@ struct VulkanRenderer::Impl {
             updateTextureDescriptor(1,*next,uiDescriptor);
             uiTexture=std::move(next);uiQuad=std::move(mesh);uiDirty=false;
             uiMetrics.uploadBytes=image.pixels.size();
+            profile::uploadBytes(image.pixels.size());
             uiMetrics.prepareMicroseconds=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-begin).count();
         }
         uiMetrics.residentBytes=static_cast<std::size_t>(uiRaster.width())*static_cast<std::size_t>(uiRaster.height())*4;
@@ -140,6 +142,10 @@ struct VulkanRenderer::Impl {
     VkCommandPool commandPool{};
     VkCommandBuffer command{};
     VkFence frameFence{};
+    VkQueryPool uiQueries{};
+    std::uint32_t timestampBits{};
+    float timestampPeriod{};
+    bool timestampsPending{};
     VkSemaphore acquired{};
     VkSwapchainKHR swapchain{};
     VkFormat colorFormat{}, depthFormat{};
@@ -178,6 +184,7 @@ struct VulkanRenderer::Impl {
     ~Impl() {
         if (device) {
             // Best effort during shutdown, including after device loss.
+            profile::deviceIdle();
             const auto result = vkDeviceWaitIdle(device);
             if (result != VK_SUCCESS) log("Device wait during shutdown returned " + std::to_string(result));
 #if VC_HAS_VOXELUI
@@ -193,6 +200,7 @@ struct VulkanRenderer::Impl {
             atlasTexture.reset();fontTexture.reset();
             if (acquired) vkDestroySemaphore(device, acquired, nullptr);
             if (frameFence) vkDestroyFence(device, frameFence, nullptr);
+            if (uiQueries) vkDestroyQueryPool(device,uiQueries,nullptr);
             if (commandPool) vkDestroyCommandPool(device, commandPool, nullptr);
             vkDestroyDevice(device, nullptr);
         }
@@ -219,6 +227,17 @@ struct VulkanRenderer::Impl {
         vkCheck(vkAllocateCommandBuffers(device, &alloc, &command), "Allocate command buffer");
         auto fence = vkStructure<VkFenceCreateInfo>(VK_STRUCTURE_TYPE_FENCE_CREATE_INFO); fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
         vkCheck(vkCreateFence(device, &fence, nullptr, &frameFence), "Create frame fence");
+        if(profile::enabled()) {
+            std::uint32_t count{};vkGetPhysicalDeviceQueueFamilyProperties(physical,&count,nullptr);
+            std::vector<VkQueueFamilyProperties> queues(count);vkGetPhysicalDeviceQueueFamilyProperties(physical,&count,queues.data());
+            timestampBits=queues[graphicsFamily].timestampValidBits;
+            VkPhysicalDeviceProperties props{};vkGetPhysicalDeviceProperties(physical,&props);timestampPeriod=props.limits.timestampPeriod;
+            if(timestampBits) {
+                auto queries=vkStructure<VkQueryPoolCreateInfo>(VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO);
+                queries.queryType=VK_QUERY_TYPE_TIMESTAMP;queries.queryCount=2;
+                vkCheck(vkCreateQueryPool(device,&queries,nullptr,&uiQueries),"Create UI timestamp queries");
+            }
+        }
         auto semaphore = vkStructure<VkSemaphoreCreateInfo>(VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO);
         vkCheck(vkCreateSemaphore(device, &semaphore, nullptr, &acquired), "Create acquire semaphore");
         atlasTexture=createTexture(atlas);
@@ -362,6 +381,8 @@ struct VulkanRenderer::Impl {
     }
     Buffer createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, const void* data = nullptr) const {
         Buffer result; result.device = device;
+        {
+        profile::Scope timing(profile::Stage::allocation);
         auto info = vkStructure<VkBufferCreateInfo>(VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO); info.size = size; info.usage = usage; info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         vkCheck(vkCreateBuffer(device, &info, nullptr, &result.handle), "Create mesh/readback buffer");
         VkMemoryRequirements requirements{}; vkGetBufferMemoryRequirements(device, result.handle, &requirements);
@@ -370,7 +391,9 @@ struct VulkanRenderer::Impl {
         alloc.memoryTypeIndex = memoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
         vkCheck(vkAllocateMemory(device, &alloc, nullptr, &result.memory), "Allocate buffer memory");
         vkCheck(vkBindBufferMemory(device, result.handle, result.memory, 0), "Bind buffer memory");
+        }
         if (data) {
+            profile::Scope timing(profile::Stage::upload);
             void* mapped{}; vkCheck(vkMapMemory(device, result.memory, 0, size, 0, &mapped), "Map mesh memory");
             std::memcpy(mapped, data, static_cast<std::size_t>(size)); vkUnmapMemory(device, result.memory);
         }
@@ -426,6 +449,8 @@ struct VulkanRenderer::Impl {
         info.extent = {image.width, image.height, 1}; info.mipLevels = 1; info.arrayLayers = 1;
         info.samples = VK_SAMPLE_COUNT_1_BIT; info.tiling = VK_IMAGE_TILING_OPTIMAL;
         info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT; info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        {
+        profile::Scope timing(profile::Stage::allocation);
         vkCheck(vkCreateImage(device, &info, nullptr, &texture->image), "Create texture atlas image");
         VkMemoryRequirements requirements{}; vkGetImageMemoryRequirements(device, texture->image, &requirements);
         auto alloc = vkStructure<VkMemoryAllocateInfo>(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO);
@@ -433,6 +458,7 @@ struct VulkanRenderer::Impl {
         alloc.memoryTypeIndex = memoryType(requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
         vkCheck(vkAllocateMemory(device, &alloc, nullptr, &texture->memory), "Allocate texture atlas memory");
         vkCheck(vkBindImageMemory(device, texture->image, texture->memory, 0), "Bind texture atlas memory");
+        }
         auto staging = createBuffer(image.pixels.size(), VK_BUFFER_USAGE_TRANSFER_SRC_BIT, image.pixels.data());
         auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO);
         begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -448,7 +474,7 @@ struct VulkanRenderer::Impl {
         auto submit = vkStructure<VkSubmitInfo>(VK_STRUCTURE_TYPE_SUBMIT_INFO);
         submit.commandBufferCount = 1; submit.pCommandBuffers = &command;
         vkCheck(vkQueueSubmit(graphicsQueue, 1, &submit, VK_NULL_HANDLE), "Submit atlas upload");
-        vkCheck(vkQueueWaitIdle(graphicsQueue), "Wait for atlas upload");
+        { profile::Scope timing(profile::Stage::synchronization);profile::queueIdle();vkCheck(vkQueueWaitIdle(graphicsQueue), "Wait for atlas upload"); }
         texture->view = createView(texture->image, info.format, VK_IMAGE_ASPECT_COLOR_BIT);
         auto sampler = vkStructure<VkSamplerCreateInfo>(VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO);
         sampler.magFilter = sampler.minFilter = linear?VK_FILTER_LINEAR:VK_FILTER_NEAREST; sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
@@ -505,7 +531,7 @@ struct VulkanRenderer::Impl {
     bool recreateSwapchain() {
         auto [width, height] = window.pixelSize();
         if (width == 0 || height == 0) return false;
-        vkCheck(vkDeviceWaitIdle(device), "Wait before swapchain recreation");
+        { profile::Scope timing(profile::Stage::synchronization);profile::deviceIdle();vkCheck(vkDeviceWaitIdle(device), "Wait before swapchain recreation"); }
 
         destroySwapchain();
         VkSurfaceCapabilitiesKHR caps{};
@@ -706,13 +732,26 @@ struct VulkanRenderer::Impl {
         std::memcpy(mapped,data.data(),bytes);vkUnmapMemory(device,instanceBuffer.memory);
     }
 
+    void waitFrame(const char* operation) {
+        profile::Scope timing(profile::Stage::synchronization);
+        vkCheck(vkWaitForFences(device,1,&frameFence,VK_TRUE,UINT64_MAX),operation);
+    }
     bool draw(const Camera& camera, const std::filesystem::path& screenshot) {
         if (window.pixelSize().first == 0 || window.pixelSize().second == 0) return false;
         if (dirty && !recreateSwapchain()) return false;
-        vkCheck(vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX), "Wait for frame");
+        waitFrame("Wait for frame");
+        double uiGpuMs{};bool gpuAvailable=false;
+        if(timestampsPending) {
+            std::array<std::uint64_t,2> ticks{};
+            vkCheck(vkGetQueryPoolResults(device,uiQueries,0,2,sizeof(ticks),ticks.data(),sizeof(std::uint64_t),VK_QUERY_RESULT_64_BIT),"Read completed UI timestamps");
+            const auto mask=timestampBits==64?UINT64_MAX:((std::uint64_t{1}<<timestampBits)-1);
+            uiGpuMs=static_cast<double>((ticks[1]-ticks[0])&mask)*timestampPeriod/1e6;gpuAvailable=true;timestampsPending=false;
+        }
+        profile::gpuTime(uiGpuMs,gpuAvailable);
 
 #if VC_HAS_VOXELUI
         prepareUi();
+        uiMetrics.gpuMilliseconds=uiGpuMs;uiMetrics.gpuTimingAvailable=gpuAvailable;
 #endif
         prepareInstances(camera);
         Buffer readback;
@@ -721,13 +760,17 @@ struct VulkanRenderer::Impl {
             readback = createBuffer(static_cast<VkDeviceSize>(extent.width) * extent.height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
         }
         std::uint32_t imageIndex{};
-        auto result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, acquired, VK_NULL_HANDLE, &imageIndex);
+        VkResult result;
+        { profile::Scope timing(profile::Stage::acquire);result=vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, acquired, VK_NULL_HANDLE, &imageIndex); }
         if (result == VK_ERROR_OUT_OF_DATE_KHR) { dirty = true; return false; }
         if (result == VK_SUBOPTIMAL_KHR) dirty = true;
         else vkCheck(result, "Acquire swapchain image");
+        const auto recordingBegin=profile::active()?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};
         vkCheck(vkResetCommandBuffer(command, 0), "Reset command buffer");
         auto begin = vkStructure<VkCommandBufferBeginInfo>(VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO); begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
         vkCheck(vkBeginCommandBuffer(command, &begin), "Begin frame commands");
+        const bool queryUi=uiQueries&&profile::active();
+        if(queryUi) vkCmdResetQueryPool(command,uiQueries,0,2);
 
         // Chain the layout transition to the acquire wait at COLOR_ATTACHMENT_OUTPUT;
         // TOP_OF_PIPE would let the transition race presentation's read of this image.
@@ -807,9 +850,16 @@ struct VulkanRenderer::Impl {
         push.offset.w=1;
         if(hudForeground.indexCount) drawMesh(hudForeground,push);
 #if VC_HAS_VOXELUI
+        if(queryUi) vkCmdWriteTimestamp(command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,uiQueries,0);
         if(uiList&&uiQuad.indexCount) {
             vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipelineLayout,0,1,&uiDescriptor,0,nullptr);
             push.offset.w=2;drawMesh(uiQuad,push);uiMetrics.drawCalls=1;
+        }
+        if(queryUi) vkCmdWriteTimestamp(command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,uiQueries,1);
+#else
+        if(queryUi) {
+            vkCmdWriteTimestamp(command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,uiQueries,0);
+            vkCmdWriteTimestamp(command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,uiQueries,1);
         }
 #endif
         vkCmdEndRendering(command);
@@ -825,6 +875,7 @@ struct VulkanRenderer::Impl {
                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0);
         }
         vkCheck(vkEndCommandBuffer(command), "End frame commands");
+        if(profile::active()) profile::record(profile::Stage::recording,static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-recordingBegin).count()));
         // Reset only after acquisition and recording succeeded, avoiding an unsignaled-fence deadlock on resize.
         vkCheck(vkResetFences(device, 1, &frameFence), "Reset frame fence");
         const VkPipelineStageFlags waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -832,13 +883,14 @@ struct VulkanRenderer::Impl {
         submit.waitSemaphoreCount = 1; submit.pWaitSemaphores = &acquired; submit.pWaitDstStageMask = &waitStage;
         submit.commandBufferCount = 1; submit.pCommandBuffers = &command;
         submit.signalSemaphoreCount = 1; submit.pSignalSemaphores = &presented[imageIndex];
-        vkCheck(vkQueueSubmit(graphicsQueue, 1, &submit, frameFence), "Submit frame");
+        { profile::Scope timing(profile::Stage::submit);vkCheck(vkQueueSubmit(graphicsQueue, 1, &submit, frameFence), "Submit frame"); }
+        timestampsPending=queryUi;
         auto present = vkStructure<VkPresentInfoKHR>(VK_STRUCTURE_TYPE_PRESENT_INFO_KHR);
         present.waitSemaphoreCount = 1; present.pWaitSemaphores = &presented[imageIndex];
         present.swapchainCount = 1; present.pSwapchains = &swapchain; present.pImageIndices = &imageIndex;
-        result = vkQueuePresentKHR(presentQueue, &present);
+        { profile::Scope timing(profile::Stage::present);result=vkQueuePresentKHR(presentQueue, &present); }
         // Readback must outlive its GPU commands even when present returns an error.
-        if (readback.handle) vkCheck(vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX), "Wait for readback");
+        if (readback.handle) waitFrame("Wait for readback");
         if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) dirty = true;
         else vkCheck(result, "Present frame");
         if (readback.handle) saveScreenshot(readback, screenshot);
@@ -858,7 +910,7 @@ ValidationReport VulkanRenderer::validationReport() const {
 void VulkanRenderer::requestResize() { impl_->dirty = true; }
 void VulkanRenderer::replaceAtlas(const ImageRgba& image) {
     image.validate();
-    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX),"Wait before atlas replacement");
+    impl_->waitFrame("Wait before atlas replacement");
     auto texture=impl_->createTexture(image);
     impl_->updateTextureDescriptor(0,*texture);
     impl_->atlasTexture=std::move(texture);
@@ -882,7 +934,7 @@ std::size_t VulkanRenderer::drawnMeshCount() const { return impl_->drawnMeshes; 
 std::size_t VulkanRenderer::drawnTriangleCount() const { return impl_->drawnTriangles; }
 void VulkanRenderer::setSelection(std::optional<glm::i64vec3> block) { impl_->selection = block; }
 void VulkanRenderer::setHud(const Mesh& colored,const Mesh& textured,bool crosshairVisible,const Mesh& foreground) {
-    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX),"Wait before replacing HUD meshes");
+    impl_->waitFrame("Wait before replacing HUD meshes");
     if(impl_->fontRevision!=ui::fonts().revision()) {
         auto texture=impl_->createTexture(ui::fonts().image(),true);
         impl_->updateTextureDescriptor(1,*texture);impl_->fontTexture=std::move(texture);impl_->fontRevision=ui::fonts().revision();
@@ -907,7 +959,7 @@ void VulkanRenderer::setAtmosphere(const Atmosphere& atmosphere) {
 std::size_t VulkanRenderer::drawnInstanceCount() const { return impl_->drawnInstances; }
 void VulkanRenderer::setModels(std::span<const Mesh> models) {
     if(models.size()>64) throw std::invalid_argument("Too many reusable models");
-    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX),"Wait before model upload");
+    impl_->waitFrame("Wait before model upload");
     std::vector<GpuMesh> uploaded;
     for(const auto& model:models) {
         if(!model.translucentIndices.empty()||model.origin!=glm::i64vec3(0)) throw std::invalid_argument("Instance models must be local and opaque");
@@ -932,7 +984,7 @@ void VulkanRenderer::setInstances(std::span<const RenderInstance> instances) {
     impl_->instances.assign(instances.begin(),instances.end());
 }
 void VulkanRenderer::upload(std::span<const Mesh> meshes) {
-    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX), "Wait before mesh upload");
+    impl_->waitFrame("Wait before mesh upload");
     std::vector<GpuMesh> uploaded;
     std::size_t triangles = 0;
     for (const auto& mesh : meshes) {
@@ -945,7 +997,7 @@ void VulkanRenderer::upload(std::span<const Mesh> meshes) {
 void VulkanRenderer::updateMeshes(std::span<const Mesh> meshes) {
     if (meshes.empty()) return;
     const auto uploadStart=std::chrono::steady_clock::now();
-    vkCheck(vkWaitForFences(impl_->device,1,&impl_->frameFence,VK_TRUE,UINT64_MAX), "Wait before replacing chunk meshes");
+    impl_->waitFrame("Wait before replacing chunk meshes");
     std::vector<GpuMesh> replacements;
     for(const auto& mesh:meshes) replacements.push_back(impl_->createMesh(mesh));
     impl_->meshes.reserve(impl_->meshes.size()+replacements.size());
@@ -963,6 +1015,7 @@ void VulkanRenderer::updateMeshes(std::span<const Mesh> meshes) {
 
 #if VC_HAS_VOXELUI
 void vc::VulkanRenderer::setUi(voxelui::DrawList list) {
+    vc::profile::Scope timing(vc::profile::Stage::comparison);
     if(impl_->uiList && *impl_->uiList==list) return;
     impl_->uiList=std::move(list);impl_->uiDirty=true;
 }

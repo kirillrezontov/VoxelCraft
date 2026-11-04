@@ -1,4 +1,5 @@
 #include "client/application.hpp"
+#include "engine/core/frame_profile.hpp"
 #if VC_HAS_VOXELUI
 #include "client/declarative_ui.hpp"
 #endif
@@ -226,7 +227,8 @@ struct ClientApplication::Impl {
 };
 ClientApplication::ClientApplication(Options options):impl_(std::make_unique<Impl>(std::move(options))) {}
 ClientApplication::~ClientApplication()=default;
-void ClientApplication::frame(Input input) { impl_->frame(std::move(input)); }
+void ClientApplication::frame(Input input) { profile::Frame frame(input.pollNanoseconds);impl_->frame(std::move(input)); }
+void ClientApplication::pollFrame() { frame(impl_->window.poll()); }
 void ClientApplication::startLocal(Options options) { impl_->start(std::move(options),false); }
 void ClientApplication::startRemote(Options options) { impl_->start(std::move(options),true); }
 void ClientApplication::requestLeave() { impl_->host.leaveRequested=true; }
@@ -247,7 +249,7 @@ ValidationReport ClientApplication::validationReport() const { return impl_->ren
 int ClientApplication::run() {
     if(impl_->options.frameLimit||!impl_->options.worldDirectory.empty()||!impl_->options.connectHost.empty())
         impl_->start(impl_->options,!impl_->options.connectHost.empty());
-    while(impl_->running) frame(impl_->window.poll());
+    while(impl_->running) pollFrame();
     shutdown();const auto report=validationReport();
     if(report.enabled) {
         log("Vulkan validation: "+std::to_string(report.errors)+" errors, "+std::to_string(report.warnings)+" warnings (including shutdown)");

@@ -1,4 +1,9 @@
 #include "client/declarative_ui.hpp"
+#include "engine/core/frame_profile.hpp"
+#if __has_include(<voxelui/profiling.hpp>)
+#include <voxelui/profiling.hpp>
+#define VC_VOXELUI_PHASE_PROFILING 1
+#endif
 #include "engine/core/log.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
@@ -6,6 +11,24 @@
 #include <stdexcept>
 
 namespace vc::client {
+namespace {
+#if VC_VOXELUI_PHASE_PROFILING
+voxelui::profiling::Sink observer() {
+    if(!profile::active()) return {};
+    return {[](voxelui::profiling::Stage stage,std::uint64_t ns,void*) {
+        using S=voxelui::profiling::Stage;
+        const auto host=stage==S::bindings?profile::Stage::bindings:stage==S::rebuild?profile::Stage::rebuild:
+            stage==S::style?profile::Stage::style:stage==S::layout?profile::Stage::layout:
+            stage==S::animation?profile::Stage::animation:stage==S::events?profile::Stage::events:profile::Stage::drawList;
+        profile::record(host,ns);
+    },nullptr};
+}
+auto observeRuntime() { return voxelui::profiling::Observe(observer()); }
+#else
+struct RuntimeObservation {};
+auto observeRuntime() { return RuntimeObservation{}; }
+#endif
+}
 DeclarativeUi::DeclarativeUi(ResourceCatalog& catalog,const std::filesystem::path& fonts,std::string address,std::string name):catalog_(catalog) {
     runtime_.resources().mountDirectory("ui",fonts);
     runtime_.resources().mount([this](std::string_view id) { return builtinOnly_?catalog_.loadBuiltin(id):catalog_.load(id); });
@@ -21,6 +44,8 @@ DeclarativeUi::DeclarativeUi(ResourceCatalog& catalog,const std::filesystem::pat
 }
 void DeclarativeUi::reload() { builtinOnly_=false;current_.reset();loadedResource_.clear();pending_=MenuAction::None;runtime_.resources().clear(); }
 void DeclarativeUi::show(std::string_view id,const voxelui::FrameInfo& frame,bool focus) {
+    [[maybe_unused]] auto observe=observeRuntime();
+    profile::Scope timing(profile::Stage::runtime);
     runtime_.update(frame);
     if(loadedResource_!=id) {
         pending_=MenuAction::None;
@@ -92,6 +117,8 @@ bool DeclarativeUi::processGameplay(SandboxUiController& ui,const Input& input,i
     return changed||before!=ui.screen();
 }
 void DeclarativeUi::process(const Input& input) {
+    [[maybe_unused]] auto observe=observeRuntime();
+    profile::Scope timing(profile::Stage::dispatch);
     using namespace voxelui;
     Event e;e.position={input.cursorX,input.cursorY};e.shift=input.text.shift;
     if(input.focusLost) { e.type=EventType::focusLost;runtime_.processEvent(e);return; }
@@ -119,5 +146,12 @@ MenuAction DeclarativeUi::takeAction() { return std::exchange(pending_,MenuActio
 std::string DeclarativeUi::address() const { const auto* value=runtime_.data().get("menu.address");return value?value->string():""; }
 std::string DeclarativeUi::name() const { const auto* value=runtime_.data().get("menu.name");return value?value->string():""; }
 bool DeclarativeUi::editing() const { const auto* focused=runtime_.find(runtime_.focusedId());return focused&&focused->node.tag=="TextInput"; }
-voxelui::DrawList DeclarativeUi::draw() { return runtime_.buildDrawList(); }
+voxelui::DrawList DeclarativeUi::draw() {
+    [[maybe_unused]] auto observe=observeRuntime();
+#if VC_VOXELUI_PHASE_PROFILING
+    return runtime_.buildDrawList();
+#else
+    profile::Scope timing(profile::Stage::drawList);return runtime_.buildDrawList();
+#endif
+}
 }

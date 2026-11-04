@@ -1,10 +1,12 @@
 #pragma once
 #include <SDL3/SDL_events.h>
 #include <array>
+#include <cstdint>
 #include "engine/ui/text_edit.hpp"
 
 namespace vc {
 struct Input {
+    std::uint64_t pollNanoseconds{};
     bool quit{}, resized{}, captured{}, focusLost{};
     bool quitWithoutSaving{};
     bool destroy{}, place{}, jump{}, toggleFlight{}, save{};

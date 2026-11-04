@@ -1,4 +1,5 @@
 #include "engine/platform/window.hpp"
+#include "engine/core/frame_profile.hpp"
 #include "engine/core/paths.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include <stdexcept>
@@ -34,6 +35,8 @@ void Window::pointerMode(bool enabled) {
 }
 SDL_WindowID Window::id() const { return SDL_GetWindowID(window_); }
 Input Window::poll() {
+    const bool measure=profile::enabled();
+    const auto begin=measure?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         input_.process(event);
@@ -54,6 +57,8 @@ Input Window::poll() {
         input.cursorX*=static_cast<float>(pixelWidth)/static_cast<float>(logicalWidth);
         input.cursorY*=static_cast<float>(pixelHeight)/static_cast<float>(logicalHeight);
     }
+    if(measure) input.pollNanoseconds=static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+        std::chrono::steady_clock::now()-begin).count());
     return input;
 }
 void Window::title(std::string_view text) { check(SDL_SetWindowTitle(window_, std::string(text).c_str())); }
