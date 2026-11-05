@@ -11,7 +11,13 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      - run: cmake --preset graphics
+      - name: Checkout explicit VoxelUI 0.2.1 source
+        uses: actions/checkout@v4
+        with:
+          repository: kirillrezontov/VoxelUI
+          ref: 8e6b3e3dc311cf2b6cfbc2cd667c668d60994f95
+          path: dependencies/VoxelUI
+      - run: cmake --preset graphics -DVC_ENABLE_VOXELUI=ON -DVC_VOXELUI_SOURCE_DIR:STRING=${{ github.workspace }}/dependencies/VoxelUI
       - run: cmake --build --preset graphics --parallel 4
       - run: ctest --preset graphics
       - uses: actions/upload-artifact@v4
@@ -21,4 +27,6 @@ jobs:
           path: |
             build/graphics/*.ppm
             build/graphics/ui-console-captures/*.ppm
+            build/graphics/voxelui-captures/*.ppm
+            build/graphics/session-captures/*.ppm
             build/graphics/Testing/Temporary/LastTest.log

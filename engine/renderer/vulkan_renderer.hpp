@@ -15,7 +15,16 @@ class Window;
 class Camera;
 struct RenderMetrics { double drawMilliseconds{},uploadMilliseconds{};std::size_t drawCalls{}; };
 struct UiRenderMetrics { double prepareMicroseconds{},gpuMilliseconds{};std::size_t drawCalls{},uploadBytes{},tessellations{},residentBytes{};bool gpuTimingAvailable{}; };
-struct ValidationReport { bool enabled{}; std::uint32_t errors{}, warnings{}; };
+struct ValidationReport { bool enabled{}; std::uint32_t errors{}, warnings{};bool synchronizationEnabled{}; };
+struct ResourceCount {
+    std::size_t live{},peak{},created{};
+    void acquire() { ++live;++created;if(live>peak) peak=live; }
+    void release() { --live; }
+};
+// Host-owned Vulkan objects, not driver/SDL heap allocations or VRAM usage.
+struct GpuResourceMetrics {
+    ResourceCount buffers,images,imageViews,memory,samplers,descriptorPools,descriptorSets,stagingBuffers;
+};
 class VulkanRenderer {
 public:
     VulkanRenderer(Window& window, const ImageRgba& atlas, bool requireValidation = false,bool vsync=true);
@@ -53,9 +62,10 @@ public:
     std::size_t drawnMeshCount() const;
     std::size_t drawnTriangleCount() const;
     // Release GPU resources before checking the report, including shutdown diagnostics.
-    // Only validationReport() and destruction are valid after shutdown().
+    // Only validationReport(), resourceMetrics() and destruction are valid after shutdown().
     void shutdown();
     ValidationReport validationReport() const;
+    GpuResourceMetrics resourceMetrics() const; // Also valid after shutdown.
 private:
     struct ValidationState;
     std::unique_ptr<ValidationState> validation_;

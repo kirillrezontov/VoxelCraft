@@ -1,5 +1,15 @@
 # VoxelUI host integration — 2026-11-02
 
+Linux continuation: sibling discovery now preserves `../VoxelUI` relative to
+VoxelCraft's source directory, including when CMake is launched from `code/`.
+Previously the `CACHE PATH` declaration converted an untyped `-D` value relative
+to the launch directory, yielding `/home/kirillr/VoxelUI` instead of
+`/home/kirillr/code/VoxelUI`. All three required source files are checked, with
+the original spelling, absolute path and exact missing file in diagnostics.
+For old caches, explicitly pass `-DVC_VOXELUI_SOURCE_DIR:STRING=../VoxelUI`.
+An installed package remains available with `-DVC_VOXELUI_SOURCE_DIR:STRING=`
+and `-DCMAKE_PREFIX_PATH=/absolute/installed/prefix`. Neither mode clones VoxelUI.
+
 VoxelUI now drives the optional application main menu, editable connection form,
 loading/saving status and recoverable error screen. XML, CSS and the SVG mark live
 in `assets/resources/voxelcraft/ui`. Actions queue Play/Connect/Back/Quit intents;

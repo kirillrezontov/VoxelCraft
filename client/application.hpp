@@ -19,6 +19,7 @@ public:
     ClientApplication& operator=(const ClientApplication&)=delete;
     int run();
     void frame(Input input);
+    void pollFrame();
     void startLocal(Options options);
     void startRemote(Options options);
     void requestLeave();

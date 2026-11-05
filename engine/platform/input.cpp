@@ -5,7 +5,18 @@
 #include <algorithm>
 
 namespace vc {
+void InputState::appendUi(UiInputEvent event) {
+    if(pending_.uiEventsOverflow) return;
+    // Cancel capture on overflow instead of retaining an unmatched press. SDL
+    // input remains bounded even if a producer floods events between frames.
+    if(pending_.uiEvents.size()>=1024||uiEventBytes_+event.text.size()>65536) {
+        pending_.uiEvents.clear();pending_.uiEvents.push_back({.type=UiInputEvent::Type::focusLost});
+        pending_.uiEventsOverflow=true;return;
+    }
+    uiEventBytes_+=event.text.size();pending_.uiEvents.push_back(std::move(event));
+}
 void InputState::resetActions() {
+    uiEventBytes_=0;
     keys_.fill(false);leftHeld_=rightHeld_=leftEditArmed_=false;wheelRemainder_=0;
     const bool quit=pending_.quit,resized=pending_.resized,discard=pending_.quitWithoutSaving;
     pending_={};pending_.quit=quit;pending_.resized=resized;pending_.quitWithoutSaving=discard;
@@ -32,11 +43,15 @@ void InputState::process(const SDL_Event& event) {
     case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
     case SDL_EVENT_WINDOW_RESTORED: pending_.resized = true; break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
-    case SDL_EVENT_WINDOW_MINIMIZED: setCaptured(false);resetActions();pending_.focusLost=true; break;
+    case SDL_EVENT_WINDOW_MINIMIZED: setCaptured(false);resetActions();pending_.focusLost=true;
+        appendUi({.type=UiInputEvent::Type::focusLost});break;
     case SDL_EVENT_TEXT_EDITING:
         if(textInput_&&event.edit.text) {
             const std::string_view value=event.edit.text;
-            if(value.size()<=4096&&utf8::valid(value)) { pending_.text.composition=value;pending_.text.compositionChanged=true; }
+            if(value.size()<=4096&&utf8::valid(value)) {
+                pending_.text.composition=value;pending_.text.compositionChanged=true;
+                appendUi({.type=UiInputEvent::Type::composition,.text=std::string(value)});
+            }
         }
         break;
     case SDL_EVENT_TEXT_INPUT:
@@ -45,6 +60,7 @@ void InputState::process(const SDL_Event& event) {
             if(text.size()<=4096&&utf8::valid(text)&&pending_.text.text.size()+text.size()<=4096) {
                 pending_.text.text+=text;
                 pending_.text.composition.clear();pending_.text.compositionChanged=true;
+                appendUi({.type=UiInputEvent::Type::textInput,.text=std::string(text)});
             }
         }
         break;
@@ -59,6 +75,7 @@ void InputState::process(const SDL_Event& event) {
         }
         const bool control=(event.key.mod&SDL_KMOD_CTRL)!=0;
         if(textInput_) {
+            appendUi({.type=UiInputEvent::Type::keyDown,.key=key,.control=control,.shift=(event.key.mod&SDL_KMOD_SHIFT)!=0});
             auto& text=pending_.text;text.shift=(event.key.mod&SDL_KMOD_SHIFT)!=0;
             if(key==SDL_SCANCODE_ESCAPE) pending_.closeUi=text.escape=true;
             if(key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_KP_ENTER) text.enter=true;
@@ -85,6 +102,7 @@ void InputState::process(const SDL_Event& event) {
             break;
         }
         if(pointerMode_&&(key==SDL_SCANCODE_TAB||key==SDL_SCANCODE_RETURN||key==SDL_SCANCODE_UP||key==SDL_SCANCODE_DOWN||key==SDL_SCANCODE_LEFT||key==SDL_SCANCODE_RIGHT)) {
+            appendUi({.type=UiInputEvent::Type::keyDown,.key=key,.control=control,.shift=(event.key.mod&SDL_KMOD_SHIFT)!=0});
             pending_.text.tab=key==SDL_SCANCODE_TAB;pending_.text.enter=key==SDL_SCANCODE_RETURN;
             pending_.text.up=key==SDL_SCANCODE_UP;pending_.text.down=key==SDL_SCANCODE_DOWN;
             pending_.text.left=key==SDL_SCANCODE_LEFT;pending_.text.right=key==SDL_SCANCODE_RIGHT;pending_.text.shift=(event.key.mod&SDL_KMOD_SHIFT)!=0;break;
@@ -102,13 +120,21 @@ void InputState::process(const SDL_Event& event) {
         break;
     }
     case SDL_EVENT_MOUSE_BUTTON_UP:
+        if(pointerMode_&&event.button.button==SDL_BUTTON_LEFT) {
+            if(std::isfinite(event.button.x)&&std::isfinite(event.button.y))
+                appendUi({.type=UiInputEvent::Type::pointerUp,.x=event.button.x,.y=event.button.y});
+            else appendUi({.type=UiInputEvent::Type::focusLost});
+        }
         if (event.button.button == SDL_BUTTON_LEFT) { pending_.primaryRelease=leftHeld_;leftHeld_ = false;leftEditArmed_=false; }
         if (event.button.button == SDL_BUTTON_RIGHT) rightHeld_ = false;
         break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN:
         if(std::isfinite(event.button.x)&&std::isfinite(event.button.y)) { cursorX_=event.button.x;cursorY_=event.button.y; }
         if (event.button.button == SDL_BUTTON_LEFT && !leftHeld_) {
-            if(pointerMode_) { pending_.primaryClick=true;pending_.cursorX=cursorX_;pending_.cursorY=cursorY_; }
+            if(pointerMode_) {
+                appendUi({.type=UiInputEvent::Type::pointerDown,.x=cursorX_,.y=cursorY_});
+                pending_.primaryClick=true;pending_.cursorX=cursorX_;pending_.cursorY=cursorY_;
+            }
             else if (!captured_) setCaptured(true);
             else { pending_.destroy = true;leftEditArmed_=true; }
             leftHeld_ = true;
@@ -121,6 +147,7 @@ void InputState::process(const SDL_Event& event) {
         break;
     case SDL_EVENT_MOUSE_MOTION:
         if(std::isfinite(event.motion.x)&&std::isfinite(event.motion.y)) { cursorX_=event.motion.x;cursorY_=event.motion.y; }
+        if(pointerMode_) appendUi({.type=UiInputEvent::Type::pointerMove,.x=cursorX_,.y=cursorY_});
         if (captured_ && std::isfinite(event.motion.xrel) && std::isfinite(event.motion.yrel)) {
             pending_.mouseX += event.motion.xrel; pending_.mouseY += event.motion.yrel;
         }
@@ -132,13 +159,15 @@ void InputState::process(const SDL_Event& event) {
             const auto steps=static_cast<int>(wheelRemainder_);
             wheelRemainder_-=static_cast<float>(steps);
             pending_.scroll=std::clamp(pending_.scroll+steps,-100,100);
+            if(pointerMode_) appendUi({.type=UiInputEvent::Type::wheel,.x=cursorX_,.y=cursorY_,.delta=std::clamp(event.wheel.y*direction,-100.f,100.f)});
         }
         break;
     default: break;
     }
 }
 Input InputState::consume() {
-    Input result = pending_; pending_ = {};
+    Input result = std::move(pending_);pending_={};uiEventBytes_=0;
+    result.orderedUiEvents=pointerMode_||textInput_||!result.uiEvents.empty();
     result.captured = captured_;result.primaryHeld=leftHeld_;result.shift=keys_[SDL_SCANCODE_LSHIFT]||keys_[SDL_SCANCODE_RSHIFT];
     result.destroyHeld=captured_&&leftHeld_&&leftEditArmed_;
     // Hit-test at the button event, even if motion follows in the same poll.

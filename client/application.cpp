@@ -1,4 +1,5 @@
 #include "client/application.hpp"
+#include "engine/core/frame_profile.hpp"
 #if VC_HAS_VOXELUI
 #include "client/declarative_ui.hpp"
 #endif
@@ -42,6 +43,7 @@ struct ClientApplication::Impl {
     float scale{1},left{},top{};
 #if VC_HAS_VOXELUI
     std::unique_ptr<DeclarativeUi> declarative;
+    bool menuPrepared{};
 #endif
     GameSession session; // Destroy first, before every borrowed application owner.
 
@@ -101,7 +103,7 @@ struct ClientApplication::Impl {
         const bool retained=std::any_of(widgets.widgets().begin(),widgets.widgets().end(),[&](const auto& widget){return widget.id==focus;});
         widgets.focus(retained?focus:screens.current()==ApplicationScreen::Error?"back":"play");dirty=true;
     }
-    void chrome() {
+    void chrome(bool emit=true) {
         if(screens.current()==ApplicationScreen::Gameplay) {
 #if VC_HAS_VOXELUI
             if(painted!=ApplicationScreen::Gameplay&&!host.gameplayUiPrepared) renderer.clearUi();
@@ -112,10 +114,15 @@ struct ClientApplication::Impl {
         const auto size=window.pixelSize();
         if(size.first<=0||size.second<=0) { dirty=true;return; }
 #if VC_HAS_VOXELUI
-        width=size.first;height=size.second;painted=screens.current();
-        declarative->update(screens.current(),screens.message(),width,height,static_cast<float>(preferences.settings.uiScale));
-        renderer.setUi(declarative->draw());
+        if(!menuPrepared||width!=size.first||height!=size.second||painted!=screens.current()||paintedMessage!=screens.message()) {
+            width=size.first;height=size.second;painted=screens.current();paintedMessage=screens.message();
+            declarative->update(screens.current(),screens.message(),width,height,static_cast<float>(preferences.settings.uiScale));
+            menuPrepared=true;
+        }
+        if(emit) renderer.setUi(declarative->draw());
         return;
+#else
+        (void)emit;
 #endif
         if(width!=size.first||height!=size.second||painted!=screens.current()||paintedMessage!=screens.message()) {
             width=size.first;height=size.second;painted=screens.current();paintedMessage=screens.message();layout();
@@ -201,9 +208,9 @@ struct ClientApplication::Impl {
         if(!running) return;
         if(input.resized) renderer.requestResize();
 #if VC_HAS_VOXELUI
-        host.gameplayUiPrepared=false;
+        host.gameplayUiPrepared=false;menuPrepared=false;
 #endif
-        chrome();host.presented=false;
+        chrome(active);host.presented=false;
         if(active) {
             if(input.quit) host.quitRequested=true;
             if(screens.current()==ApplicationScreen::Loading&&(input.closeUi||input.pause)) host.leaveRequested=true;
@@ -226,7 +233,8 @@ struct ClientApplication::Impl {
 };
 ClientApplication::ClientApplication(Options options):impl_(std::make_unique<Impl>(std::move(options))) {}
 ClientApplication::~ClientApplication()=default;
-void ClientApplication::frame(Input input) { impl_->frame(std::move(input)); }
+void ClientApplication::frame(Input input) { profile::Frame frame(input.pollNanoseconds);impl_->frame(std::move(input)); }
+void ClientApplication::pollFrame() { frame(impl_->window.poll()); }
 void ClientApplication::startLocal(Options options) { impl_->start(std::move(options),false); }
 void ClientApplication::startRemote(Options options) { impl_->start(std::move(options),true); }
 void ClientApplication::requestLeave() { impl_->host.leaveRequested=true; }
@@ -247,7 +255,7 @@ ValidationReport ClientApplication::validationReport() const { return impl_->ren
 int ClientApplication::run() {
     if(impl_->options.frameLimit||!impl_->options.worldDirectory.empty()||!impl_->options.connectHost.empty())
         impl_->start(impl_->options,!impl_->options.connectHost.empty());
-    while(impl_->running) frame(impl_->window.poll());
+    while(impl_->running) pollFrame();
     shutdown();const auto report=validationReport();
     if(report.enabled) {
         log("Vulkan validation: "+std::to_string(report.errors)+" errors, "+std::to_string(report.warnings)+" warnings (including shutdown)");

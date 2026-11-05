@@ -1,5 +1,9 @@
 # VoxelCraft — v0.8.2 release candidate
 
+Linux VoxelUI continuation: [build repair, profiling and upload lifetime work](docs/voxelui-linux-v1.md),
+[measured latency](docs/voxelui-latency-baseline.md) and [memory audit](docs/voxelui-memory-audit.md).
+The native DrawList Vulkan backend remains pending; the current path retains CPU rasterization.
+
 A C++23, SDL3 and Vulkan 1.3 voxel sandbox foundation. Windows is the primary release
 target; development and hardware rendering verification currently run on Linux.
 
