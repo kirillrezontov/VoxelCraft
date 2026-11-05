@@ -1,5 +1,12 @@
 # VoxelCraft Development Roadmap
 
+Linux UI continuation: sibling/installed-package builds, phase instrumentation,
+ordered UI events and reusable frame-fenced uploads are implemented. See the
+[latency baseline](docs/voxelui-latency-baseline.md), [resource audit](docs/voxelui-memory-audit.md)
+and [verification/next increment](docs/voxelui-linux-v1.md). The native Vulkan
+DrawList backend, SVG tessellation, glyph atlas and GPU conformance suite remain
+unfinished. Inventory/hotbar/crafting follow that gate; legacy screens remain.
+
 The next-generation program has completed the modular core and application/session
 split. Milestone 3 implements the [native/data/resource/core extension foundation](docs/native-modding.md);
 its executed verification is recorded separately. Optional VoxelUI application

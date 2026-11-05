@@ -43,7 +43,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kirillrezontov/VoxelUI
-          ref: 8e6b3e3dc311
+          ref: 8e6b3e3dc311cf2b6cfbc2cd667c668d60994f95
           path: dependencies/VoxelUI
       - name: Install Linux UI prerequisites
         run: |

@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("output", type=pathlib.Path)
 parser.add_argument("--before", type=pathlib.Path, required=True)
 parser.add_argument("--after", type=pathlib.Path, required=True)
+parser.add_argument("--metadata", type=pathlib.Path, help="Explicit hardware/method metadata for these runs")
 args = parser.parse_args()
 
 
@@ -24,6 +25,8 @@ def distribution(values):
 
 report = {"schema": 1, "units": {"cpu": "milliseconds", "gpu": "milliseconds"},
           "quantiles": "median; p95/p99 nearest rank; worst maximum", "runs": {}}
+if args.metadata:
+    report["metadata"] = json.loads(args.metadata.read_text())
 raw_directory = args.output.parent / "voxelui-latency-raw"
 raw_directory.mkdir(parents=True, exist_ok=True)
 for revision, directory in (("before", args.before), ("after", args.after)):

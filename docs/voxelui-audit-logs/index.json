@@ -1,0 +1,110 @@
+{
+  "cpu-debug-final.log": {
+    "archive": "cpu-debug-final.log.gz",
+    "uncompressed_sha256": "9348ecece16d3c6ea3339613f327b61f6e1c10516f3b03966561f185e2e46f96"
+  },
+  "cpu-clean-release-final.log": {
+    "archive": "cpu-clean-release-final.log.gz",
+    "uncompressed_sha256": "baeaba55c3d57dd616c2bf19d70e2cc864b239d325c08532999624174c245a09"
+  },
+  "cpu-asan-final.log": {
+    "archive": "cpu-asan-final.log.gz",
+    "uncompressed_sha256": "4774221f097fdf73eb60d0c0d8ebd240c20bb96b7a94126e86305ba5a0f297fb"
+  },
+  "cpu-legacy.log": {
+    "archive": "cpu-legacy.log.gz",
+    "uncompressed_sha256": "48b8a14b9429d659dd95a7829922dbe354c99a9ebee7a65159c839c823b6e218"
+  },
+  "input-release-final.log": {
+    "archive": "input-release-final.log.gz",
+    "uncompressed_sha256": "6f3bd827005f8aa78ab423e69c7d62aba54faf0c67f046562a6fee789d0b10e7"
+  },
+  "input-asan-final.log": {
+    "archive": "input-asan-final.log.gz",
+    "uncompressed_sha256": "cc5dc1e8c23b258db428f82814a066ce581e93271cdc559685a919d3c4412173"
+  },
+  "graphics-all.log": {
+    "archive": "graphics-all.log.gz",
+    "uncompressed_sha256": "14a85e6e9ae47ff16949d3ffad80394c802c2e7528de08a9b8d543382cf5af62"
+  },
+  "graphics-retry.log": {
+    "archive": "graphics-retry.log.gz",
+    "uncompressed_sha256": "fbbf22ff2b435fa9c98c3124a6e1ea10358b15a93e99efb312396e8884b2e4f9"
+  },
+  "graphics-legacy.log": {
+    "archive": "graphics-legacy.log.gz",
+    "uncompressed_sha256": "55ae2b111fe5eeda853e20ba07f3d7240ee77e5c68bc3dd3f42db0021317131b"
+  },
+  "application-validation.log": {
+    "archive": "application-validation.log.gz",
+    "uncompressed_sha256": "820c26dfd7ee10fd559d58162b9cbf02f8633891b1e6780945c5684f2000e9e5"
+  },
+  "lifecycle-validation-final.log": {
+    "archive": "lifecycle-validation-final.log.gz",
+    "uncompressed_sha256": "1c2161b1a3646a0e4dc0193b502306fff1a7154886f25f69cfc82b70df204dc8"
+  },
+  "x11-validation.log": {
+    "archive": "x11-validation.log.gz",
+    "uncompressed_sha256": "0e9d1e39a62e68eacc9d5d3736518fcee1e1628264fe17650a7eb7f71deefeca"
+  },
+  "asan-sdl-final.log": {
+    "archive": "asan-sdl-final.log.gz",
+    "uncompressed_sha256": "6089481cf031d5394bc4d4b464bd92d85a2983b659a63d1d278a9651834bfdc4"
+  },
+  "asan-software.log": {
+    "archive": "asan-software.log.gz",
+    "uncompressed_sha256": "66eeef400736e1efde75dd3884db12172b9de80102da2743cfdcdd777b90f26f"
+  },
+  "asan-vulkan-final.log": {
+    "archive": "asan-vulkan-final.log.gz",
+    "uncompressed_sha256": "73f7083ffe7ea3402c1d12a7c6be7838dd7cbe2483b4b1ee422ae478e36befec"
+  },
+  "asan-bridge-final.log": {
+    "archive": "asan-bridge-final.log.gz",
+    "uncompressed_sha256": "5b7bd23f46302bca091ad069fb9456304de94b3c093475cc40f0c16c3e6e7631"
+  },
+  "asan-session.log": {
+    "archive": "asan-session.log.gz",
+    "uncompressed_sha256": "9be3d783a9a95342ed56c6fdad307a2ee811ee64ad4b9aa41e67f7e33cb7125e"
+  },
+  "screenshot-validation.log": {
+    "archive": "screenshot-validation.log.gz",
+    "uncompressed_sha256": "187dbf82d26770130250d302f7d4e98ca4863426d803dfc229eb7884e89f8e32"
+  },
+  "tsan-tests.log": {
+    "archive": "tsan-tests.log.gz",
+    "uncompressed_sha256": "e54fc315173ece9c398f53c8e2151c60ce80a908dc7175e57f722ad5a300292e"
+  },
+  "tsan-server-tests.log": {
+    "archive": "tsan-server-tests.log.gz",
+    "uncompressed_sha256": "370930f378e250b6aef4c8ea42a75c324ceaaeca3b9cfd8278a24ae84a929da4"
+  },
+  "voxelui-debug.log": {
+    "archive": "voxelui-debug.log.gz",
+    "uncompressed_sha256": "03414e1d6f568bf9b67cdecbfa9fc9150d820ce368b614253969197105989a7c"
+  },
+  "voxelui-release.log": {
+    "archive": "voxelui-release.log.gz",
+    "uncompressed_sha256": "5ed325d7318d4d9923b8868208109f8a594af30879650991f2ac38a8ec999547"
+  },
+  "voxelui-asan.log": {
+    "archive": "voxelui-asan.log.gz",
+    "uncompressed_sha256": "635b8e1d83139f569ce77037685d1e2a67a00df84429dc3726add4a43480405f"
+  },
+  "consumer-debug.log": {
+    "archive": "consumer-debug.log.gz",
+    "uncompressed_sha256": "e2de9b57b052f12cb0d355c99a7a6fb61d71c1789e1ea43513431a41d7de2034"
+  },
+  "consumer-release.log": {
+    "archive": "consumer-release.log.gz",
+    "uncompressed_sha256": "4c5cbe3eb8edf6898d556d1dd3055fa4a15cb27292a86be9a55ea17b49b80091"
+  },
+  "installed-host.log": {
+    "archive": "installed-host.log.gz",
+    "uncompressed_sha256": "61d5a688de75b8778c6f1b8e63b77d08fe39026a885af85daf2a10ed69ea5c75"
+  },
+  "x11-session-tests.log": {
+    "archive": "x11-session-tests.log.gz",
+    "uncompressed_sha256": "35110a4a43480a15f320cf08f98945384f99ee3d8adb028209ac4af4de72c25e"
+  }
+}
