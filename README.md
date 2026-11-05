@@ -370,3 +370,7 @@ display/radius options are startup overrides. `--help` lists launch options.
 
 Fonts are embedded in the client and bundled with redistribution notices; no OS
 font or font development library is required. See [build instructions](docs/building.md).
+
+Linux VoxelUI native-backend progress and reproducible checks are recorded in the
+[native geometry continuation](docs/voxelui-native-geometry-continuation.md).
+The application currently retains the software-surface bridge.

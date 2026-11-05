@@ -31,3 +31,7 @@ The v0.8 multiplayer foundation and v0.8.1 stabilization candidate are implement
 See the [stabilization record](v0.8.1-stabilization.md) for current test/benchmark
 results and release blockers; Windows and cross-platform human LAN acceptance
 remain pending.
+
+Linux VoxelUI continuation: optional CPU rectangle geometry preparation is tested;
+native Vulkan recording, glyph/SVG caches and application selection remain pending.
+See [verification and next slice](voxelui-native-geometry-continuation.md).

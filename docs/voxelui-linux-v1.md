@@ -260,3 +260,7 @@ round trip; multiplayer acceptance/rejection and stale/reordered authoritative
 updates; resource-pack/native-mod icons and screen/focus transitions. Keep the
 legacy inventory until every behavior is covered. No further UI migration was
 implemented before the native renderer gate.
+
+A subsequent [native geometry continuation](voxelui-native-geometry-continuation.md)
+adds optional bounded CPU rectangle mesh preparation and reference tests in
+VoxelUI. Vulkan recording and application-native rendering remain pending.
