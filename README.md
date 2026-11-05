@@ -374,3 +374,6 @@ font or font development library is required. See [build instructions](docs/buil
 Linux VoxelUI native-backend progress and reproducible checks are recorded in the
 [native geometry continuation](docs/voxelui-native-geometry-continuation.md).
 The application currently retains the software-surface bridge.
+
+Native UI progress: [primitive Vulkan renderer and current test selection](docs/voxelui-native-primitives.md).
+The application still uses the software bridge until text, images and SVG are supported.

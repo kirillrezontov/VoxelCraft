@@ -1,5 +1,6 @@
 #pragma once
 #include "client/screen_manager.hpp"
+#include "client/ui_frame_clock.hpp"
 #include "engine/resources/catalog.hpp"
 #include "engine/platform/input.hpp"
 #include "game/ui/sandbox_ui.hpp"
@@ -27,6 +28,7 @@ public:
 private:
     ResourceCatalog& catalog_;
     voxelui::Runtime runtime_;
+    UiFrameClock frameClock_;
     std::optional<ApplicationScreen> current_;
     MenuAction pending_{};
     bool builtinOnly_{};

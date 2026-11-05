@@ -264,3 +264,8 @@ implemented before the native renderer gate.
 A subsequent [native geometry continuation](voxelui-native-geometry-continuation.md)
 adds optional bounded CPU rectangle mesh preparation and reference tests in
 VoxelUI. Vulkan recording and application-native rendering remain pending.
+
+The next [native primitive renderer continuation](voxelui-native-primitives.md)
+adds actual host-context GPU recording and primitive conformance. Text/images/SVG
+and native application rendering remain pending; see that report for current test
+selection instead of interpreting this older matrix as fresh results.

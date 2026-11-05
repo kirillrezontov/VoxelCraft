@@ -5,7 +5,11 @@ ordered UI events and reusable frame-fenced uploads are implemented. See the
 [latency baseline](docs/voxelui-latency-baseline.md), [resource audit](docs/voxelui-memory-audit.md)
 and [verification/next increment](docs/voxelui-linux-v1.md). The native Vulkan
 DrawList backend, SVG tessellation, glyph atlas and GPU conformance suite remain
-unfinished. Inventory/hotbar/crafting follow that gate; legacy screens remain.
+unfinished. The [native primitive continuation](docs/voxelui-native-primitives.md)
+adds a host-context pipeline, rounded rectangles, reusable buffers and hardware
+readback checks in VoxelUI, plus elapsed animation time in the game. Text/images/SVG
+and the application adapter remain. Inventory/hotbar/crafting follow that gate;
+legacy screens remain.
 
 The next-generation program has completed the modular core and application/session
 split. Milestone 3 implements the [native/data/resource/core extension foundation](docs/native-modding.md);

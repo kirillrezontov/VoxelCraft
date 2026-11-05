@@ -39,11 +39,11 @@ jobs:
           - { compiler: clang++, config: Release }
     steps:
       - uses: actions/checkout@v4
-      - name: Checkout explicit VoxelUI 0.2.1 source
+      - name: Checkout pinned VoxelUI integration source
         uses: actions/checkout@v4
         with:
           repository: kirillrezontov/VoxelUI
-          ref: 8e6b3e3dc311cf2b6cfbc2cd667c668d60994f95
+          ref: 2b8ecd52b44ca1ce0d8e2fb26091f53277312ef8
           path: dependencies/VoxelUI
       - name: Install Linux UI prerequisites
         run: |

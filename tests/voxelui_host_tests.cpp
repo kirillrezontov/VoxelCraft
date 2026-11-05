@@ -143,3 +143,16 @@ TEST(VoxelUiHost, PausePointerCaptureCancelsOnFocusLossAndScreenReplacement) {
     ASSERT_TRUE(update());
     process(press);process(release);EXPECT_EQ(controller.screen(),vc::UiScreen::Gameplay);
 }
+
+TEST(VoxelUiHost, AnimationUsesElapsedTimeAndBoundsResumeDelta) {
+    vc::client::UiFrameClock clock;
+    using namespace std::chrono_literals;
+    const auto start=vc::client::UiFrameClock::Clock::time_point{};
+    EXPECT_FLOAT_EQ(clock.advance(start),0.f);
+    EXPECT_FLOAT_EQ(clock.advance(start+8ms),.008f);
+    EXPECT_FLOAT_EQ(clock.advance(start+8ms),0.f);
+    EXPECT_FLOAT_EQ(clock.advance(start+24ms),.016f);
+    EXPECT_FLOAT_EQ(clock.advance(start+5s),.1f);
+    clock.reset();
+    EXPECT_FLOAT_EQ(clock.advance(start+10s),0.f);
+}

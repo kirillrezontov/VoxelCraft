@@ -1,0 +1,38 @@
+{
+  "voxelui_commit": "b006f61",
+  "voxelcraft_base": "d419794",
+  "logs": [
+    {
+      "path": "voxelui-native-final.log.gz",
+      "uncompressed_sha256": "bf8a965333c892f17acbd3d525fbf2c7c2a926e466fbd3195af2843492d8d2bf"
+    },
+    {
+      "path": "voxelui-native-tests.log.gz",
+      "uncompressed_sha256": "5fff311848d756aca7b6afbda212bf4efadddc788ef22f1e8a82cbe4f859c311"
+    },
+    {
+      "path": "voxelui-native-asan-tests.log.gz",
+      "uncompressed_sha256": "3e633d2dc13a25acba0b24dda6cb36163d14a879af4906866e8fad68cf401536"
+    },
+    {
+      "path": "voxelui-native-final-asan.log.gz",
+      "uncompressed_sha256": "2bdc08c549a78c380189d19e09730462395832a34c1f482090a9b30ed718e88e"
+    },
+    {
+      "path": "voxelui-native-context-asan.log.gz",
+      "uncompressed_sha256": "b821f090d47ec4872b3e1858cf2a4c935b6fe5038a47263b291aff2976dc9ba5"
+    },
+    {
+      "path": "voxelui-native-clean-tests.log.gz",
+      "uncompressed_sha256": "8e4017a52ab521c0b66053d48a9500dce3904c232b1aa78b121a7550d5294fa9"
+    },
+    {
+      "path": "voxelcraft-host-final.log.gz",
+      "uncompressed_sha256": "bd0153665c70a04805a40275357141e976b32a93fb989aeb1a84ad0110308152"
+    },
+    {
+      "path": "voxelcraft-native-continuation-run.log.gz",
+      "uncompressed_sha256": "cdce8f5742f4c8add20877eea38da957f7bf7b0a7229c822e9e016babf22a280"
+    }
+  ]
+}

@@ -42,7 +42,7 @@ DeclarativeUi::DeclarativeUi(ResourceCatalog& catalog,const std::filesystem::pat
         char* text=SDL_GetClipboardText();std::string result=text?text:"";SDL_free(text);return result;
     },[](std::string text) { if(!SDL_SetClipboardText(text.c_str())) log(SDL_GetError()); });
 }
-void DeclarativeUi::reload() { builtinOnly_=false;current_.reset();loadedResource_.clear();pending_=MenuAction::None;runtime_.resources().clear(); }
+void DeclarativeUi::reload() { frameClock_.reset(); builtinOnly_=false;current_.reset();loadedResource_.clear();pending_=MenuAction::None;runtime_.resources().clear(); }
 void DeclarativeUi::show(std::string_view id,const voxelui::FrameInfo& frame,bool focus) {
     [[maybe_unused]] auto observe=observeRuntime();
     profile::Scope timing(profile::Stage::runtime);
@@ -61,7 +61,8 @@ void DeclarativeUi::show(std::string_view id,const voxelui::FrameInfo& frame,boo
         voxelui::Event event;event.type=voxelui::EventType::keyDown;event.key=voxelui::Key::tab;
         if(focus&&runtime_.focusedId().empty()) runtime_.processEvent(event);
     }
-    runtime_.update(frame);
+    auto timedFrame=frame;timedFrame.deltaSeconds=frameClock_.advance();
+    runtime_.update(timedFrame);
 }
 void DeclarativeUi::update(ApplicationScreen screen,std::string_view message,int width,int height,float scale) {
     runtime_.data().set("menu.message",std::string(message));
@@ -74,13 +75,13 @@ void DeclarativeUi::update(ApplicationScreen screen,std::string_view message,int
     show(id,frame,true);current_=screen;
 }
 bool DeclarativeUi::updateGameplay(UiScreen screen,bool survival,unsigned health,bool remote,int width,int height,float scale) {
-    if(width<=0||height<=0) return false;
+    if(width<=0||height<=0) { frameClock_.reset();return false; }
     if((screen!=UiScreen::Gameplay&&screen!=UiScreen::Pause)||(survival&&health==0)) {
         if(!loadedResource_.empty()) {
             voxelui::Event event;event.type=voxelui::EventType::focusLost;runtime_.processEvent(event);
             runtime_.close();loadedResource_.clear();pending_=MenuAction::None;
         }
-        return false;
+        frameClock_.reset();return false;
     }
     runtime_.data().set("game.mode",survival?"Survival":"Creative");
     runtime_.data().set("game.health",static_cast<double>(std::min(health,20u)));
