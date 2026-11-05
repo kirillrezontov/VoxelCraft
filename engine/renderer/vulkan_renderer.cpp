@@ -1,5 +1,8 @@
 #if VC_HAS_VOXELUI
 #include <voxelui/software.hpp>
+#if VC_VOXELUI_NATIVE
+#include <renderer.hpp>
+#endif
 #endif
 #include "engine/core/paths.hpp"
 #include "engine/core/frame_profile.hpp"
@@ -102,6 +105,10 @@ struct VulkanRenderer::ValidationState {
 
 struct VulkanRenderer::Impl {
 #if VC_HAS_VOXELUI
+#if VC_VOXELUI_NATIVE
+    voxelui::vulkan::Compiler uiCompiler;
+    std::unique_ptr<voxelui::vulkan::Renderer> uiNative;
+#endif
     std::optional<voxelui::DrawList> uiList;
     voxelui::SoftwareRenderer uiRaster;
     std::unique_ptr<Texture> uiTexture;
@@ -116,6 +123,34 @@ struct VulkanRenderer::Impl {
     // queue and command buffer; no second context or GPU work in setUi().
     void prepareUi() {
         uiMetrics = {};
+#if VC_VOXELUI_NATIVE
+        if(!uiList) {uiNative.reset();uiCompiler.clear();return;}
+        if(!uiNative) {uiNative=std::make_unique<voxelui::vulkan::Renderer>(physical,device,colorFormat,std::span(&frameFence,1),voxelui::vulkan::LifetimeObserver{
+            [](voxelui::vulkan::ResourceKind kind,bool allocated,void* context) noexcept {
+                auto& metrics=*static_cast<GpuResourceMetrics*>(context);ResourceCount* count=nullptr;
+                using K=voxelui::vulkan::ResourceKind;
+                switch(kind){
+                case K::buffer:count=&metrics.buffers;break;case K::memory:count=&metrics.memory;break;
+                case K::image:count=&metrics.images;break;case K::imageView:count=&metrics.imageViews;break;
+                case K::sampler:count=&metrics.samplers;break;case K::descriptorPool:count=&metrics.descriptorPools;break;
+                case K::descriptorSet:count=&metrics.descriptorSets;break;case K::staging:count=&metrics.stagingBuffers;break;
+                case K::atlasPage:count=&metrics.atlasPages;break;case K::pipeline:count=&metrics.pipelines;break;
+                case K::pipelineLayout:count=&metrics.pipelineLayouts;break;case K::descriptorLayout:count=&metrics.descriptorLayouts;break;
+                default:break;}
+                if(count) {if(allocated) count->acquire();else count->release();}
+            },&validation.resources});uiDirty=true;}
+        if(uiDirty) {
+            const auto begin=std::chrono::steady_clock::now();
+            const auto tessellations=uiCompiler.tessellations();
+            auto mesh=uiCompiler.compile(*uiList);
+            uiMetrics.tessellations=uiCompiler.tessellations()-tessellations;
+            if(!mesh) throw std::runtime_error("Native UI command "+std::to_string(mesh.error().command)+": "+mesh.error().message);
+            uiNative->upload(0,*mesh);uiDirty=false;
+            uiMetrics.prepareMicroseconds=std::chrono::duration<double,std::micro>(std::chrono::steady_clock::now()-begin).count();
+        }
+        uiMetrics.residentBytes=uiNative->statistics().residentBufferBytes+uiNative->statistics().atlasBytes;
+        return;
+#endif
         if (!uiList) {
             uiTexture.reset();uiQuad={};uiStaging={};uiUploadPending=uiTextureUploaded=false;
             return;
@@ -145,6 +180,14 @@ struct VulkanRenderer::Impl {
         uiMetrics.residentBytes=static_cast<std::size_t>(uiRaster.width())*static_cast<std::size_t>(uiRaster.height())*4;
     }
     void recordUiUpload() {
+#if VC_VOXELUI_NATIVE
+        if(uiNative) {
+            const auto before=uiNative->statistics().uploadBytes;
+            uiNative->recordUploads(command,0);
+            uiMetrics.uploadBytes=uiNative->statistics().uploadBytes-before;profile::uploadBytes(uiMetrics.uploadBytes);
+        }
+        return;
+#endif
         if(!uiUploadPending) return;
         recordTextureUpload(*uiTexture,uiStaging,uiTextureUploaded);
         uiMetrics.uploadBytes=static_cast<std::size_t>(uiTexture->width)*uiTexture->height*4;
@@ -573,6 +616,9 @@ struct VulkanRenderer::Impl {
     }
 
     void destroySwapchain() {
+#if VC_VOXELUI_NATIVE
+        uiNative.reset();
+#endif
         if(translucentPipeline) vkDestroyPipeline(device,translucentPipeline,nullptr);
         translucentPipeline=VK_NULL_HANDLE;
         if(hudPipeline) vkDestroyPipeline(device,hudPipeline,nullptr);
@@ -918,10 +964,22 @@ struct VulkanRenderer::Impl {
         if(hudForeground.indexCount) drawMesh(hudForeground,push);
 #if VC_HAS_VOXELUI
         if(queryUi) vkCmdWriteTimestamp(command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,uiQueries,0);
+#if VC_VOXELUI_NATIVE
+        if(uiList&&uiNative) {
+            vkCmdEndRendering(command);
+            auto memory=vkStructure<VkMemoryBarrier>(VK_STRUCTURE_TYPE_MEMORY_BARRIER);
+            memory.srcAccessMask=VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;memory.dstAccessMask=VK_ACCESS_COLOR_ATTACHMENT_READ_BIT|VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+            vkCmdPipelineBarrier(command,VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,0,1,&memory,0,nullptr,0,nullptr);
+            color.loadOp=VK_ATTACHMENT_LOAD_OP_LOAD;rendering.pDepthAttachment=nullptr;
+            vkCmdBeginRendering(command,&rendering);
+            uiNative->record(command,0,extent);uiMetrics.drawCalls=1;
+        }
+#else
         if(uiList&&uiQuad.indexCount) {
             vkCmdBindDescriptorSets(command,VK_PIPELINE_BIND_POINT_GRAPHICS,pipelineLayout,0,1,&uiDescriptor,0,nullptr);
             push.offset.w=2;drawMesh(uiQuad,push);uiMetrics.drawCalls=1;
         }
+#endif
         if(queryUi) vkCmdWriteTimestamp(command,VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,uiQueries,1);
 #else
         if(queryUi) {

@@ -1,3 +1,5 @@
+> Historical checkpoint. See [native v1 implementation and current validation](voxelui-native-v1.md) for the November 6 continuation.
+
 # Linux VoxelUI continuation
 
 This is a buildable performance and lifetime foundation, **not completion of the

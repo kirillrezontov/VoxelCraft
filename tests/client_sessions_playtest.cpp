@@ -29,7 +29,8 @@ void until(Condition condition,Pump pump) {
 }
 int main(int argc,char** argv) {
     try {
-        require(argc==3,"Expected capture and example-mod directories");
+        const bool windowLifecycle=argc==4&&std::string_view(argv[3])=="--window-lifecycle";
+        require(argc==3||windowLifecycle,"Expected capture and example-mod directories [--window-lifecycle]");
         const auto captures=vc::utf8Path(argv[1]);std::filesystem::create_directories(captures);
         vc::test::TempDirectory temporary;
         vc::client::Options config;config.settingsFile=temporary.path()/"settings.vcs";config.noMods=true;config.requireValidation=true;
@@ -41,15 +42,31 @@ int main(int argc,char** argv) {
         require(!std::filesystem::exists(config.worldDirectory),"Main menu touched a world directory");
         until([&] { return app.renderer().draw(vc::Camera{},captures/"main-menu.ppm"); },tick);
         auto* nativeWindow=SDL_GetWindowFromID(app.windowId());
+        // Platform minimize/restore is a separate mandatory graphics case: a
+        // compositor lacking minimize must not prevent session/network coverage.
+        if(windowLifecycle) {
+        for(auto [width,height]:{std::pair{800,600},std::pair{1120,720}}) {
+            require(SDL_SetWindowSize(nativeWindow,width,height),"Could not request window resize");
+            until([&] {int actualWidth{},actualHeight{};return SDL_GetWindowSize(nativeWindow,&actualWidth,&actualHeight)&&actualWidth==width&&actualHeight==height;},
+                [&] {SDL_PumpEvents();vc::Input changed;changed.resized=true;app.frame(changed);});
+            std::cout<<"Acknowledged resize "<<width<<'x'<<height<<'\n';
+            until([&] {return app.renderer().draw(vc::Camera{},captures/(std::to_string(width)+".ppm"));},tick);
+        }
         // Settle the initial Wayland configure/focus before requesting minimize.
         for(int i=0;i<8;++i) { SDL_PumpEvents();tick();vc::Window::idle(); }
         require(nativeWindow&&SDL_MinimizeWindow(nativeWindow),"Could not minimize menu window");
         until([&] { return (SDL_GetWindowFlags(nativeWindow)&SDL_WINDOW_MINIMIZED)!=0; },[&] { SDL_PumpEvents();tick(); });
         std::cout<<"Menu minimized\n"<<std::flush;
+        require(!app.renderer().draw(vc::Camera{}),"Minimized renderer submitted UI");
         tick(); // A zero-sized menu must not create invalid font/layout geometry.
         require(SDL_RestoreWindow(nativeWindow)&&SDL_RaiseWindow(nativeWindow),"Could not restore menu window");
         until([&] { return (SDL_GetWindowFlags(nativeWindow)&SDL_WINDOW_MINIMIZED)==0; },[&] { SDL_PumpEvents();tick(); });
         vc::Input resize;resize.resized=true;app.frame(resize);
+
+            app.shutdown();const auto report=app.validationReport();
+            require(report.enabled&&!report.errors&&!report.warnings,"Window lifecycle validation failed");
+            std::cout<<"Application minimize/restore and shutdown passed\n";return 0;
+        }
 
         // Cancel before the first terrain job is accepted; the store lock must go.
         app.startLocal(config);tick();app.requestLeave();
@@ -77,7 +94,9 @@ int main(int argc,char** argv) {
             // Exercise the actual pause/settings/leave controls on the first cycle.
             if(cycle==0) {
                 vc::Input pause;pause.pause=true;app.frame(pause);
-                const vc::SandboxUiLayout layout(config.width,config.height);
+                int actualWidth{},actualHeight{};
+                require(SDL_GetWindowSizeInPixels(nativeWindow,&actualWidth,&actualHeight),"Cannot query current session viewport");
+                const vc::SandboxUiLayout layout(actualWidth,actualHeight,app.settings().uiScale);
                 auto click=[&](vc::UiRect rect) { vc::Input input;input.primaryClick=true;input.cursorX=rect.x+rect.width/2;input.cursorY=rect.y+rect.height/2;app.frame(input); };
 #if VC_HAS_VOXELUI
                 // Resume is initially focused. Navigate the authored XML controls.

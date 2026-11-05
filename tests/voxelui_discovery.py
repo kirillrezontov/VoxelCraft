@@ -29,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix="vc-voxelui-discovery-") as directory:
     def configure(name, cwd, value, succeeds=True, missing=None):
         result = subprocess.run(
             ["cmake", "-S", str(host), "-B", str(root / name),
-             f"-DVC_VOXELUI_SOURCE_DIR={value}"],
+             "-DVC_VOXELUI_NATIVE=OFF", f"-DVC_VOXELUI_SOURCE_DIR={value}"],
             cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         )
         assert (result.returncode == 0) == succeeds, result.stdout

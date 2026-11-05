@@ -51,7 +51,7 @@ for revision, directory in (("before", args.before), ("after", args.after)):
                 "calls_per_frame": {phase: distribution([t["calls"][phase] for t in timings])
                                     for phase in timings[0]["calls"]},
                 "ui_gpu_ms_previous_submission": distribution([t["gpu_ms"] for t in timings if t["gpu_ms"] is not None]),
-                "changed_frames": sum(t["upload_bytes"] > 0 for t in timings),
+                "frames_with_uploads": sum(t["upload_bytes"] > 0 for t in timings),
                 "upload_bytes": distribution([t["upload_bytes"] for t in timings]),
                 "queue_idle_calls": sum(t["queue_idle_calls"] for t in timings),
                 "device_idle_calls": sum(t["device_idle_calls"] for t in timings),

@@ -1,3 +1,5 @@
+> Historical checkpoint. See [native v1 implementation and current validation](voxelui-native-v1.md) for the November 6 continuation.
+
 # Native primitive rendering and test freshness
 
 This continuation starts at VoxelCraft `d419794` and VoxelUI `2b8ecd5`.

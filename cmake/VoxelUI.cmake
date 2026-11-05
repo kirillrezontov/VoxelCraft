@@ -1,3 +1,4 @@
+option(VC_VOXELUI_NATIVE "Render VoxelUI DrawLists using the native Vulkan backend" ON)
 # Explicit source checkout or installed package; the host owns GPU integration.
 # A CACHE PATH converts an untyped command-line -D value to an absolute path
 # relative to CMake's working directory before we can resolve it. Keep the
@@ -22,6 +23,7 @@ if(VC_VOXELUI_SOURCE_DIR)
         endif()
     endforeach()
     message(STATUS "VoxelUI source: '${VC_VOXELUI_SOURCE_DIR}' -> '${vc_voxelui_source}'")
+    set(VOXELUI_VULKAN ${VC_VOXELUI_NATIVE})
     set(VOXELUI_PREVIEW_SDL OFF)
     set(VOXELUI_TESTS OFF)
     add_subdirectory("${vc_voxelui_source}" "${CMAKE_CURRENT_BINARY_DIR}/voxelui" EXCLUDE_FROM_ALL)
@@ -34,4 +36,8 @@ else()
 endif()
 if(NOT TARGET VoxelUI::voxelui OR NOT TARGET VoxelUI::software)
     message(FATAL_ERROR "VoxelUI must provide VoxelUI::voxelui and its reference VoxelUI::software target")
+endif()
+
+if(VC_VOXELUI_NATIVE AND NOT TARGET VoxelUI::vulkan)
+    message(FATAL_ERROR "Native UI requires VoxelUI built with VOXELUI_VULKAN=ON. Use the current sibling checkout or install that optional backend. For explicit software-reference comparison use -DVC_VOXELUI_NATIVE=OFF.")
 endif()

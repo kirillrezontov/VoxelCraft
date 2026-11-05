@@ -1,0 +1,94 @@
+[
+  {
+    "path": "vui-clean-final-tests.log.gz",
+    "sha256_uncompressed": "ef44364f18e9d448c80b92842aca0f15d5c69b5ab879acb95ae1a38521efcc48"
+  },
+  {
+    "path": "vui-release-final-tests.log.gz",
+    "sha256_uncompressed": "6f91c8ffa614a336202bf61d10a5d9ac6b392f2deb43523dddf6ac50dffed164"
+  },
+  {
+    "path": "vui-final-code-tests.log.gz",
+    "sha256_uncompressed": "94f4481f1726472074266608345d32a7b98c0df55b0c31cba18d5d2b2f587721"
+  },
+  {
+    "path": "vui-debug-final-tests.log.gz",
+    "sha256_uncompressed": "a841a2d31b044bdde65fd877f14f608cdcd166ca685503912b3b7397f171921e"
+  },
+  {
+    "path": "vui-release-consumer-link.log.gz",
+    "sha256_uncompressed": "489a31ad9645881e69a3c52537e379cec673164f4677edd214279275efafc6c0"
+  },
+  {
+    "path": "vui-debug-consumer-link.log.gz",
+    "sha256_uncompressed": "85c4f10a24aa77b5a71846a11ebab767ef1028ca32bf3039995218ae0ccc0afa"
+  },
+  {
+    "path": "vui-final-sanitizer-tests.log.gz",
+    "sha256_uncompressed": "353d497d1a4ea060c6483600c2ab651d72573810699edbc3f329b9a57227228d"
+  },
+  {
+    "path": "vc-native-asan-lifecycle.log.gz",
+    "sha256_uncompressed": "fdd5b5d925b65c0a50e222fb5c8165da647d379864337fd4a38dde4424ae47a5"
+  },
+  {
+    "path": "vc-native-asan-host.log.gz",
+    "sha256_uncompressed": "1621907acae12b5c5a7b608b4ebf2e73f2f4dff48d3b28d145a8ea73605f4c8b"
+  },
+  {
+    "path": "vc-native-lifecycle.log.gz",
+    "sha256_uncompressed": "6d0a0f67941c1910016d34a132ea1c9b5307fdb9100aee2d875f9d4dc946fcd2"
+  },
+  {
+    "path": "vc-ship-session-tests.log.gz",
+    "sha256_uncompressed": "34316987015494385d1408dfa52f0d9dc6ded07c78b78b0bea83dcf1746aedc2"
+  },
+  {
+    "path": "vc-nested-window-test.log.gz",
+    "sha256_uncompressed": "50436f61fa1f02ab71b9234eeb27683149d5f23389a64a25a94279f086bf4b25"
+  },
+  {
+    "path": "vc-focused-test.log.gz",
+    "sha256_uncompressed": "a0e8b8466a1e94a788b595e64c27d108ac47533d96b2113104e035b867746e25"
+  },
+  {
+    "path": "vc-inventory-views-tests.log.gz",
+    "sha256_uncompressed": "e9fd49db9144fbf4551af8eb12a4b6a9fc5dc4bc0add1865c385fbf902593144"
+  },
+  {
+    "path": "vc-native-server-tests.log.gz",
+    "sha256_uncompressed": "48c549843f8d3dfc21130b0168d1e2e32dfebb8570045c5ed382aec906acef8d"
+  },
+  {
+    "path": "vc-native-world-final.log.gz",
+    "sha256_uncompressed": "0a8dfda4e5501bf440bae7cf3a5e412f5738c964a2007fd0171cdd57d2bde0b8"
+  },
+  {
+    "path": "vui-dbus-driver-stack.log.gz",
+    "sha256_uncompressed": "e1e8ca593bfd72770d4db9f700271d22316978e2351d7b3efbe9b56909ab90d3"
+  },
+  {
+    "path": "dbus-explicit-control.log.gz",
+    "sha256_uncompressed": "04cac8e5fabb5c3a9b858b8af35d54d6a025df9358c8c133dc40bdf4bb15956b"
+  },
+  {
+    "path": "vc-isolated-window-final.log.gz",
+    "sha256_uncompressed": "fffb3086e6f648b655799a2677bfc7baf132b6d2cea03f33ad57bc456262f764"
+  },
+  {
+    "path": "vc-focused-final-tests.log.gz",
+    "sha256_uncompressed": "a15d54507ee2df732705cefb776317735adab91a201dacb518527f51ee5654b9"
+  },
+  {
+    "path": "vc-headless-tsan-tests.log.gz",
+    "sha256_uncompressed": "e1e88752721f4062631f28a574c466e45e61d8fc96b6ee7dc80a2e456caacf63"
+  },
+  {
+    "path": "vc-headless-linked-libraries.log.gz",
+    "sha256_uncompressed": "48fc4d29eb5807387f1661150206fadbef7a6b322ef86c9f1bebe4ac8d918c90"
+  },
+  {
+    "path": "vc-current-legacy-build.log.gz",
+    "sha256_uncompressed": "d88635c11147c9dc5a3eb91d12bff18bbc3adcb0dc2b73fb40922d7cd48ff051"
+  }
+]

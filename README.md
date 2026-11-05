@@ -376,4 +376,9 @@ Linux VoxelUI native-backend progress and reproducible checks are recorded in th
 The application currently retains the software-surface bridge.
 
 Native UI progress: [primitive Vulkan renderer and current test selection](docs/voxelui-native-primitives.md).
-The application still uses the software bridge until text, images and SVG are supported.
+That primitive-only report is historical; the native v1 report below supersedes it.
+
+Linux native VoxelUI is enabled by default with `VC_ENABLE_VOXELUI=ON`; it requires
+an optional `VoxelUI::vulkan` package or the current sibling source checkout.
+[Native renderer, measured latency, build commands and remaining work](docs/voxelui-native-v1.md).
+Use `VC_VOXELUI_NATIVE=OFF` explicitly for software-reference comparison.

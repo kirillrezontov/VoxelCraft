@@ -1,3 +1,5 @@
+> Historical checkpoint. See [native v1 implementation and current validation](voxelui-native-v1.md) for the November 6 continuation.
+
 # VoxelUI Linux memory and Vulkan lifetime audit
 
 The bridge's tracked first-party Vulkan objects stabilize during repeated screen

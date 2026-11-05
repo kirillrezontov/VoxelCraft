@@ -73,11 +73,8 @@ int main(int argc,char** argv) {
         renderer.clearUi();(void)renderer.draw(camera);update();
         window.resize(1180,760);renderer.requestResize();for(int i=0;i<8;++i) { (void)frame();vc::Window::idle(); }
         require(frame(output/"resized.ppm"),"Resize capture failed");
-        window.minimize();
-        for(int i=0;i<20;++i) { SDL_PumpEvents();(void)window.poll();if(window.pixelSize().first==0) break;vc::Window::idle(); }
-        require(window.pixelSize().first==0,"Minimize was not acknowledged");
-        require(!renderer.draw(camera),"Minimized renderer submitted UI");
-        window.restore();renderer.requestResize();for(int i=0;i<12;++i) { SDL_PumpEvents();(void)frame();vc::Window::idle(); }
+        // Minimize/restore assertions run in Client.Sessions.WindowLifecycle.
+        // Keep resource reload and retirement coverage independent of compositor support.
         const std::string reloadXml=R"(<Screen version="1" id="reload" style="font-family:ui:DejaVuSans.ttf;color:#fff"><Text value="{status}" style="font-size:30dp"/></Screen>)";
         ui.resources().mount([reloadXml](std::string_view id)->std::optional<std::vector<std::uint8_t>> {
             if(id=="host:screen.xml") return std::vector<std::uint8_t>(reloadXml.begin(),reloadXml.end());
@@ -85,11 +82,11 @@ int main(int argc,char** argv) {
         });
         checkUi(ui,ui.load("host:screen.xml"),"Resource screen load failed");
         ui.resources().invalidate("ui:DejaVuSans.ttf");checkUi(ui,ui.reload(),"Resource reload failed");
-        require(frame(output/"restored.ppm"),"Restore/reload capture failed");
+        require(frame(output/"reloaded.ppm"),"Resource reload capture failed");
         for(int i=0;i<3;++i) (void)frame();
         const auto metrics=renderer.uiMetrics();require(metrics.drawCalls>0,"No GPU UI draws recorded");require(metrics.uploadBytes==0&&metrics.tessellations==0,"Warm host UI frame recreated resources");
         std::cout<<"UI prepare "<<metrics.prepareMicroseconds<<" us; GPU "<<metrics.gpuMilliseconds<<" ms, timing available "<<metrics.gpuTimingAvailable<<"; draws "<<metrics.drawCalls<<"; residency "<<metrics.residentBytes<<" bytes\n";
         renderer.clearSession();renderer.shutdown();const auto validation=renderer.validationReport();require(validation.enabled&&!validation.errors&&!validation.warnings,"Host Vulkan validation errors/warnings including shutdown");
-        std::cout<<"Shared Vulkan UI-only/world composition, repeated screen replacement, resize, minimize/restore, resource reload and shutdown passed\n";
+        std::cout<<"Shared Vulkan UI-only/world composition, repeated screen replacement, resize request, resource reload and shutdown passed\n";
     } catch(const std::exception& e) { std::cerr<<e.what()<<'\n';return 1; }
 }

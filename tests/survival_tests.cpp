@@ -4,6 +4,7 @@
 #include "game/player/spawn.hpp"
 #include "engine/voxel/streaming.hpp"
 #include "game/ui/sandbox_ui.hpp"
+#include "game/ui/inventory_view.hpp"
 #include "game/content/atlas.hpp"
 #include "game/content/blocks.hpp"
 #include <gtest/gtest.h>
@@ -164,4 +165,24 @@ TEST(SurvivalUi, RemoteActionsRequestServerTransactionsWithoutChangingTheMirror)
     EXPECT_EQ(state.inventory.count(items.require("voxelcraft:log")),1u);EXPECT_EQ(state.inventory.count(items.require("voxelcraft:planks")),0u);EXPECT_TRUE(ui.takeCraftedItems().empty());
     EXPECT_EQ(vc::applyInventoryAction(state.inventory,actions[0],items,recipes),vc::InventoryActionResult::Changed);
     EXPECT_EQ(state.inventory.count(items.require("voxelcraft:planks")),4u);
+}
+
+TEST(SurvivalInventory, PresentationSnapshotsFollowAuthoritativeStateWithoutOwningIt) {
+    const auto blocks=vc::builtinBlocks();const auto items=vc::builtinItems(blocks);
+    vc::CreativeInventory creative(items);vc::SurvivalInventory inventory;
+    const auto recipes=vc::builtinRecipes(items);const auto dirt=items.require("voxelcraft:dirt");
+    ASSERT_TRUE(inventory.add(dirt,12,items));
+    auto before=vc::inventoryView(creative,&inventory,items,recipes,7);
+    ASSERT_EQ(before.slots.size(),36u);EXPECT_EQ(before.slots[0].count,12);
+    EXPECT_EQ(before.slots[0].icon.identifier,"voxelcraft:dirt");EXPECT_EQ(before.slots[0].icon.resourceRevision,7u);
+    const vc::InventoryAction intent{vc::InventoryActionKind::TransferHalf,0,9,0};
+    EXPECT_TRUE(vc::validInventoryIntent(before,intent));
+    EXPECT_EQ(vc::applyInventoryAction(inventory,intent,items,recipes),vc::InventoryActionResult::Changed);
+    auto after=vc::inventoryView(creative,&inventory,items,recipes,8);
+    EXPECT_EQ(before.slots[0].count,12);EXPECT_EQ(after.slots[0].count,6);EXPECT_EQ(after.slots[9].count,6);
+    EXPECT_GT(after.revision,before.revision);
+    EXPECT_FALSE(vc::validInventoryIntent(after,{vc::InventoryActionKind::Swap,999,0,0}));
+    EXPECT_FALSE(vc::validInventoryIntent(after,{vc::InventoryActionKind::Craft,0,0,999999}));
+    auto infinite=vc::inventoryView(creative,nullptr,items,{},8);
+    EXPECT_EQ(infinite.slots.size(),9u);EXPECT_FALSE(vc::validInventoryIntent(infinite,intent));
 }

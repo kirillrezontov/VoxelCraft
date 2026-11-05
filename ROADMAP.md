@@ -1,22 +1,19 @@
 # VoxelCraft Development Roadmap
 
-Linux UI continuation: sibling/installed-package builds, phase instrumentation,
-ordered UI events and reusable frame-fenced uploads are implemented. See the
-[latency baseline](docs/voxelui-latency-baseline.md), [resource audit](docs/voxelui-memory-audit.md)
-and [verification/next increment](docs/voxelui-linux-v1.md). The native Vulkan
-DrawList backend, SVG tessellation, glyph atlas and GPU conformance suite remain
-unfinished. The [native primitive continuation](docs/voxelui-native-primitives.md)
-adds a host-context pipeline, rounded rectangles, reusable buffers and hardware
-readback checks in VoxelUI, plus elapsed animation time in the game. Text/images/SVG
-and the application adapter remain. Inventory/hotbar/crafting follow that gate;
-legacy screens remain.
+Linux native UI v1: menus, pause and HUD now use a host-context DrawList renderer
+with reusable glyph/image atlases and cached SVG geometry. See the
+[current implementation, latency and lifetime report](docs/voxelui-native-v1.md).
+Inventory/hotbar/crafting have typed snapshot/intent groundwork; their declarative
+screen migration and sustained manual IME testing remain. External NVIDIA/DBus
+LeakSanitizer findings remain unresolved; counted first-party GPU resources retire.
 
 The next-generation program has completed the modular core and application/session
 split. Milestone 3 implements the [native/data/resource/core extension foundation](docs/native-modding.md);
 its executed verification is recorded separately. Optional VoxelUI application
 menus, status/error screens, mode/health HUD and local/multiplayer pause controls
-are implemented through the reference Vulkan surface bridge. A native GPU DrawList
-adapter, inventory/settings/console migration and release hardening remain next.
+are implemented through the native Vulkan DrawList backend. The software surface
+bridge remains an explicit reference option. Inventory/settings/console migration
+and release hardening remain next.
 Existing release tasks below retain their original scope.
 
 

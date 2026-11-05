@@ -1,3 +1,5 @@
+> Historical checkpoint. See [native v1 implementation and current validation](voxelui-native-v1.md) for the November 6 continuation.
+
 # VoxelUI latency baseline and upload changes
 
 These are new measurements from November 5, 2026. The native renderer milestone is unfinished. The UI still rasterizes a full RGBA surface on the CPU; this is the dominant remaining cost.

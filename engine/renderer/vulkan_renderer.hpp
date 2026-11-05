@@ -23,7 +23,7 @@ struct ResourceCount {
 };
 // Host-owned Vulkan objects, not driver/SDL heap allocations or VRAM usage.
 struct GpuResourceMetrics {
-    ResourceCount buffers,images,imageViews,memory,samplers,descriptorPools,descriptorSets,stagingBuffers;
+    ResourceCount buffers,images,imageViews,memory,samplers,descriptorPools,descriptorSets,stagingBuffers,atlasPages,pipelines,pipelineLayouts,descriptorLayouts;
 };
 class VulkanRenderer {
 public:

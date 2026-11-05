@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: kirillrezontov/VoxelUI
-          ref: 2b8ecd52b44ca1ce0d8e2fb26091f53277312ef8
+          ref: a1cb8d394efcd57a1fd5d289493d541dee74c08c
           path: dependencies/VoxelUI
       - run: cmake --preset graphics -DVC_ENABLE_VOXELUI=ON -DVC_VOXELUI_SOURCE_DIR:STRING=${{ github.workspace }}/dependencies/VoxelUI
       - run: cmake --build --preset graphics --parallel 4
